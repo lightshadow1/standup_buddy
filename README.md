@@ -272,6 +272,7 @@ These modes validate the hybrid detection approach but are **not the primary pro
 ### Prerequisites
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) package manager
+- **ffmpeg** (for audio format conversion in Live Mode)
 - OpenAI API key (for GPT-4 and TTS)
 - Smallest.ai Pulse API key (for emotion detection)
 
@@ -284,6 +285,14 @@ cd standup_buddy
 
 # Install dependencies with uv
 uv sync
+
+# Install ffmpeg (if not already installed)
+# macOS:
+brew install ffmpeg
+# Ubuntu/Debian:
+sudo apt-get install ffmpeg
+# Windows:
+# Download from https://ffmpeg.org/download.html
 
 # Configure environment variables
 cp .env.example .env
@@ -363,14 +372,20 @@ async_standup/
 ├── src/async_standup/
 │   ├── storage.py              # JSON data storage
 │   ├── generate_audio.py       # OpenAI TTS integration
-│   ├── analyze_audio.py        # Pulse API integration
+│   ├── analyze_audio.py        # Pulse API integration + WebM→MP3 conversion
 │   ├── conversation_agent.py   # GPT-4 conversation generation & analysis
-│   └── insight_engine.py       # Hybrid stuck detection logic
-├── tests/                      # Unit and integration tests
-├── hybrid_demo.py              # Full pipeline demo
-├── generate_conversation_audio.py  # Audio generation from conversations
-├── demo.py                     # Original emotion-only demo
-└── data/                       # Generated audio and results
+│   ├── insight_engine.py       # Hybrid stuck detection logic
+│   ├── personas.py             # AI persona definitions for testing
+│   ├── voice_generator.py      # Audio generation for Demo Mode
+│   └── voice_session.py        # Session management for voice demos
+├── tests/                      # Unit and integration tests (52 tests)
+├── static/                     # Frontend web interface
+│   └── voice_demo.html         # Browser UI for Live/Demo/AI Persona modes
+├── voice_demo_server.py        # FastAPI backend server (main entry point)
+├── data/
+│   ├── voice_sessions/         # Generated demo audio files
+│   └── voice_metadata/         # Session metadata and history
+└── README.md, AGENTS.md        # Documentation
 ```
 
 ## API Keys
