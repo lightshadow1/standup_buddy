@@ -118,13 +118,13 @@ sequenceDiagram
     Browser->>Engineer: 📊 Display: Vagueness 70%, Hedging 12<br/>📈 Stuck probability: 58%
     Browser->>Engineer: 🔊 Play next question
     
-    Note over Engineer,Server: 5. Repeat for 5 exchanges
+    Note over Engineer,Server: 5. Repeat for 3 exchanges
     
     Note over Browser,Server: 6. Complete Session
     Browser->>Server: POST /api/interactive/save
     Server->>Server: Generate final chart
     Server-->>Browser: Session saved ✅
-    Browser->>Engineer: 📈 Show stuck probability progression<br/>Exchange 1: 28% → Exchange 5: 73%
+    Browser->>Engineer: 📈 Show stuck probability progression<br/>Exchange 1: 28% → Exchange 3: 73%
 ```
 
 ## How It Works (Live Mode)
@@ -144,7 +144,7 @@ sequenceDiagram
    ↓
 6. Display real-time analysis with adaptive next question
    ↓
-7. After 5 exchanges, show final stuck probability progression
+7. After 3 exchanges, show final stuck probability progression
 ```
 
 ### Key Features
@@ -249,17 +249,15 @@ Even with sentiment analysis, text can't detect:
 
 ## Live Demo Results
 
-Example progression showing engineer becoming stuck over 5 exchanges:
+Example progression showing engineer becoming stuck over 3 exchanges:
 
 | Exchange | Status | Stuck Prob | Vagueness | Hedging | Help-Seeking |
 |----------|--------|-----------|-----------|---------|-------------|
 | 1 | ✅ ON TRACK | 28% | 30% | 5 | Yes |
-| 2 | ✅ ON TRACK | 35% | 40% | 8 | Yes |
-| 3 | ⚠️ WARNING | 48% | 55% | 12 | No |
-| 4 | ⚠️ WARNING | 62% | 70% | 15 | No |
-| 5 | 🚨 STUCK | 73% | 85% | 20 | No |
+| 2 | ⚠️ WARNING | 48% | 55% | 12 | No |
+| 3 | 🚨 STUCK | 73% | 85% | 20 | No |
 
-**Analysis**: Clear progression from healthy (28%) to stuck (73%). Conversational signals (vagueness, hedging) increased while help-seeking disappeared.
+**Analysis**: Clear progression from healthy (28%) to stuck (73%) over 3 exchanges. Conversational signals (vagueness, hedging) increased while help-seeking disappeared.
 
 ### Testing Modes
 
@@ -317,7 +315,7 @@ uv run python voice_demo_server.py
    - Speech patterns
    - Conversational signals
 5. AI asks adaptive follow-up question
-6. Repeat for 5 exchanges
+6. Repeat for 3 exchanges
 7. View final stuck probability progression
 8. Session saved to history
 

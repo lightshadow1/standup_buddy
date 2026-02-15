@@ -639,8 +639,8 @@ def generate_followup_question(transcript: str, analysis: dict, question_number:
     """Generate adaptive follow-up question based on user's response."""
     
     # Define question flow
-    if question_number >= 4:
-        return None  # End after 5 questions
+    if question_number >= 2:
+        return None  # End after 3 questions
     
     vagueness = analysis.get('vagueness_score', 0)
     help_seeking = analysis.get('help_seeking', False)

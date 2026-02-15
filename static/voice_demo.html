@@ -884,14 +884,14 @@
                     </button>
                     
                     <div id="ai-persona-session" class="live-session" style="display: none;">
-                        <div class="progress-indicator" id="ai-progress">Question 1 of 5</div>
+                        <div class="progress-indicator" id="ai-progress">Question 1 of 3</div>
                         <div id="ai-phase-indicator" class="phase-indicator"></div>
                         <div id="ai-exchanges-container"></div>
                     </div>
                 </div>
                 
                 <div id="live-session" class="live-session">
-                    <div class="progress-indicator" id="live-progress">Question 1 of 5</div>
+                    <div class="progress-indicator" id="live-progress">Question 1 of 3</div>
                     
                     <!-- Phase Indicator -->
                     <div id="phase-indicator" class="phase-indicator"></div>
@@ -1437,8 +1437,8 @@
                 document.getElementById('live-progress').style.display = 'block';
                 document.getElementById('phase-indicator').style.display = 'block';
                 
-                document.getElementById('question-text').textContent = data.question_text;
-                document.getElementById('live-progress').textContent = `Question ${currentQuestionNumber + 1} of 5`;
+                    document.getElementById('question-text').textContent = data.question_text;
+                document.getElementById('live-progress').textContent = `Question ${currentQuestionNumber + 1} of 3`;
                 
                 // Enable recording
                 document.getElementById('record-btn').disabled = false;
@@ -1504,7 +1504,7 @@
                     
                     // Update UI
                     document.getElementById('question-text').textContent = data.next_question;
-                    document.getElementById('live-progress').textContent = `Question ${currentQuestionNumber + 1} of 5`;
+                    document.getElementById('live-progress').textContent = `Question ${currentQuestionNumber + 1} of 3`;
                     
                     // Hide phase indicator between exchanges
                     hidePhaseIndicator();
@@ -2116,7 +2116,7 @@
                 
                 // Show session UI
                 document.getElementById('ai-persona-session').style.display = 'block';
-                document.getElementById('ai-progress').textContent = `Question 1 of 5`;
+                document.getElementById('ai-progress').textContent = `Question 1 of 3`;
                 
                 showStatus('complete', `✅ AI standup started for ${personaName}!`);
                 
@@ -2206,7 +2206,7 @@
                     } else {
                         // Continue to next exchange
                         aiCurrentExchange++;
-                        document.getElementById('ai-progress').textContent = `Question ${aiCurrentExchange + 1} of 5`;
+                        document.getElementById('ai-progress').textContent = `Question ${aiCurrentExchange + 1} of 3`;
                         
                         showStatus('complete', `✅ Exchange ${exchangeNumber + 1} complete. Next question...`);
                         
