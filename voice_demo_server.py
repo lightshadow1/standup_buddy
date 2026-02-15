@@ -7,6 +7,7 @@ Provides:
 """
 
 import asyncio
+import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -55,6 +56,41 @@ app.add_middleware(
 
 # Initialize session manager
 session_manager = SessionManager()
+
+
+def convert_webm_to_mp3(webm_path: str) -> str:
+    """Convert WebM audio to MP3 for better emotion detection.
+    
+    WebM (Opus codec) causes Pulse API to detect false sadness (~60%).
+    Converting to MP3 restores accurate emotion detection.
+    
+    Args:
+        webm_path: Path to WebM file
+        
+    Returns:
+        Path to converted MP3 file
+        
+    Raises:
+        RuntimeError: If ffmpeg is not available or conversion fails
+    """
+    mp3_path = webm_path.replace('.webm', '.mp3')
+    
+    try:
+        subprocess.run([
+            'ffmpeg', '-i', webm_path,
+            '-codec:a', 'libmp3lame',  # MP3 encoder
+            '-b:a', '128k',            # 128kbps bitrate
+            '-ar', '24000',            # 24kHz sample rate (matches TTS)
+            '-ac', '1',                # Mono
+            '-y',                      # Overwrite without asking
+            mp3_path
+        ], check=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        
+        return mp3_path
+    except FileNotFoundError:
+        raise RuntimeError("ffmpeg not found. Install with: brew install ffmpeg (macOS) or apt-get install ffmpeg (Linux)")
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Audio conversion failed: {e}")
 
 # Mount static files directory (for serving HTML/CSS/JS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -521,17 +557,30 @@ async def process_recording(
         with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as tmp_file:
             content = await audio.read()
             tmp_file.write(content)
-            tmp_path = tmp_file.name
+            webm_path = tmp_file.name
+        
+        # Convert WebM to MP3 for accurate emotion detection
+        # (WebM causes Pulse API to detect ~60% false sadness)
+        try:
+            print(f"[Interactive] Converting WebM to MP3 for accurate emotions...")
+            mp3_path = convert_webm_to_mp3(webm_path)
+            print(f"[Interactive] Conversion complete: {mp3_path}")
+        except RuntimeError as e:
+            print(f"[Interactive] WARNING: Conversion failed: {e}")
+            print(f"[Interactive] Proceeding with WebM (emotion detection may be inaccurate)")
+            mp3_path = webm_path  # Fallback to WebM if conversion fails
         
         # Process with Smallest.ai Pulse API
         try:
-            pulse_result = process_audio_file(tmp_path)
+            pulse_result = process_audio_file(mp3_path)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Pulse API error: {str(e)}")
         finally:
-            # Clean up temp file
+            # Clean up temp files
             import os
-            os.unlink(tmp_path)
+            os.unlink(webm_path)
+            if mp3_path != webm_path and os.path.exists(mp3_path):
+                os.unlink(mp3_path)
         
         transcript = pulse_result.get('transcript', '')
         emotions = pulse_result.get('emotions', {})
