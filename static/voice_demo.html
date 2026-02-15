@@ -1490,7 +1490,7 @@
                     showStatus('complete', '✅ Standup complete! Results saved.');
                     displayFinalAnalysis();
                     document.getElementById('record-btn').disabled = true;
-                    document.getElementById('live-session').classList.remove('active');
+                    // Keep live-session visible to show all exchanges + final analysis
                 } else {
                     // Continue to next question
                     currentQuestionNumber++;
