@@ -1492,6 +1492,7 @@
                     showLowConfidenceWarning(data);
                 } else if (data.is_complete) {
                     // Standup complete - save and show final analysis
+                    hidePhaseIndicator(); // Hide "analyzing" indicator
                     await saveInteractiveSession();
                     showStatus('complete', '✅ Standup complete! Results saved.');
                     displayFinalAnalysis();
