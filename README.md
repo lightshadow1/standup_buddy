@@ -8,33 +8,30 @@
 
 ```mermaid
 graph TB
-    User["👤 Engineer<br/>(Voice Input)"]
+    User["👤 Engineer<br/>(Speaks into Mic)"]
     Browser["🌐 Browser<br/>(MediaRecorder API)"]
     Server["⚙️ FastAPI Server<br/>(Backend)"]
     GPT4["🤖 GPT-4<br/>(Analysis + Questions)"]
-    TTS["🔊 OpenAI TTS<br/>(Audio Generation)"]
     Pulse["🎵 Smallest.ai Pulse<br/>(Transcription + Emotions)"]
     Storage["💾 Session Storage<br/>(History)"]
     
     User -->|"1. Speak Answer"| Browser
-    Browser -->|"2. Upload Audio"| Server
-    Server -->|"3. Analyze Audio"| Pulse
+    Browser -->|"2. Upload Audio (WebM)"| Server
+    Server -->|"3. Send for Analysis"| Pulse
     Pulse -->|"4. Transcript + Emotions"| Server
     Server -->|"5. Detect Stuck Signals"| GPT4
     GPT4 -->|"6. Vagueness, Hedging, etc."| Server
-    Server -->|"7. Generate Next Question"| GPT4
-    GPT4 -->|"8. Question Text"| Server
-    Server -->|"9. Convert to Speech"| TTS
-    TTS -->|"10. Audio File"| Server
-    Server -->|"11. Store Session"| Storage
-    Server -->|"12. Analysis + Question"| Browser
-    Browser -->|"13. Display + Play"| User
+    Server -->|"7. Calculate Stuck Probability<br/>(70% conv + 30% emotion)"| Server
+    Server -->|"8. Generate Next Question"| GPT4
+    GPT4 -->|"9. Adaptive Question Text"| Server
+    Server -->|"10. Store Session"| Storage
+    Server -->|"11. Analysis + Next Question"| Browser
+    Browser -->|"12. Display Analysis"| User
     
     style User fill:#e3f2fd
     style Browser fill:#fff3e0
     style Server fill:#f3e5f5
     style GPT4 fill:#e8f5e9
-    style TTS fill:#c8e6c9
     style Pulse fill:#fce4ec
     style Storage fill:#f1f8e9
 ```
@@ -52,6 +49,7 @@ sequenceDiagram
     Note over Engineer,Server: 1. Start Session
     Engineer->>Browser: Click "Start My Standup"
     Browser->>Server: POST /api/interactive/start
+    Note right of Server: TTS only for AI questions,<br/>not user's voice
     Server->>GPT4: Generate first question
     GPT4-->>Server: "What did you work on yesterday?"
     Server->>Server: Convert to audio (TTS)
