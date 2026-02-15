@@ -172,6 +172,54 @@ stuck_probability = conversational_score * 0.7 + emotional_score * 0.3
 - `0.4-0.7`: ⚠️ **WARNING** - Monitor closely
 - `< 0.4`: ✅ **ON TRACK** - Healthy progress
 
+## Why Voice Over Text?
+
+AsyncStandup is fundamentally **voice-first**, not text-with-audio bolted on:
+
+### Signals Only Voice Can Capture
+
+**Emotional tone:**
+- Frustration, sadness, anxiety in vocal patterns
+- Energy levels (burnt out vs energized)
+- Confidence vs uncertainty in delivery
+
+**Hesitation patterns:**
+- Pauses between words (thinking time)
+- Filler words ("um", "uh", "like") frequency
+- Speech rate (rushed vs careful)
+
+**Authenticity:**
+- Harder to fake enthusiasm in voice than text
+- Natural expression reveals true state
+- Lower cognitive load than writing polished updates
+
+### Voice UX Advantages
+
+**Lower friction:**
+- Speak 150+ words/min vs type 40 words/min
+- No need to craft "perfect" written status
+- Captures nuance that typing loses
+
+**Async-friendly:**
+- Record standup anytime across timezones
+- No scheduled meetings required
+- AI analyzes overnight, flags issues by morning
+
+**Natural for distributed teams:**
+- Already using Slack voice messages
+- Feels conversational, not bureaucratic
+- Better engagement than text-only standups
+
+### Quantified Impact
+
+The emotional analysis (30% of stuck detection) would be **impossible with text alone**.
+Even with sentiment analysis, text can't detect:
+- Vocal fatigue patterns (burnout indicator)
+- Hesitation from uncertainty (vs confident knowledge gaps)
+- Frustrated tone (stuck) vs enthusiastic urgency (making progress)
+
+**Voice isn't just convenient—it's essential for early stuck detection.**
+
 ## Live Demo Results
 
 Example progression showing engineer becoming stuck over 5 exchanges:
