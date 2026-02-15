@@ -1,0 +1,1936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AsyncStandup Voice Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .persona-selector {
+            margin-bottom: 30px;
+        }
+        
+        .persona-selector label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .persona-selector select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        .persona-selector select:hover {
+            border-color: #667eea;
+        }
+        
+        .persona-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .persona-description {
+            margin-top: 10px;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .generate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .status-box {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .status-box.generating {
+            display: block;
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+        }
+        
+        .status-box.complete {
+            display: block;
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+        
+        .status-box.error {
+            display: block;
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+        
+        .playback-container {
+            margin-top: 30px;
+            display: none;
+        }
+        
+        .playback-container.active {
+            display: block;
+        }
+        
+        .day-header {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0 15px 0;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .exchange {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        
+        .exchange-question {
+            margin-bottom: 10px;
+        }
+        
+        .exchange-answer {
+            margin-top: 10px;
+        }
+        
+        .speaker-label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .speaker-label.interviewer {
+            color: #667eea;
+        }
+        
+        .speaker-label.persona {
+            color: #764ba2;
+        }
+        
+        .text-content {
+            margin: 8px 0;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .audio-controls {
+            margin-top: 10px;
+        }
+        
+        .play-btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .play-btn:hover {
+            background: #5568d3;
+        }
+        
+        .play-btn.playing {
+            background: #28a745;
+        }
+        
+        .analysis-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .analysis-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .analysis-day {
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 6px;
+            background: white;
+            border-left: 4px solid #e0e0e0;
+        }
+        
+        .analysis-day.on_track {
+            border-left-color: #28a745;
+        }
+        
+        .analysis-day.warning {
+            border-left-color: #ffc107;
+        }
+        
+        .analysis-day.stuck {
+            border-left-color: #dc3545;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .progress-text {
+            margin-top: 10px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        /* Live Mode Styles */
+        .mode-selector {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        
+        .mode-selector label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .mode-options {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .mode-option {
+            flex: 1;
+            position: relative;
+        }
+        
+        .mode-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+        }
+        
+        .mode-option label {
+            display: block;
+            padding: 15px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .mode-option input[type="radio"]:checked + label {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .mode-option label:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+        
+        .live-controls {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .live-controls.active {
+            display: block;
+        }
+        
+        .start-standup-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 20px;
+        }
+        
+        .start-standup-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.4);
+        }
+        
+        .start-standup-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .live-session {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .live-session.active {
+            display: block;
+        }
+        
+        .question-display {
+            padding: 20px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .question-text {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        
+        .record-btn {
+            width: 100%;
+            padding: 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .record-btn:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .record-btn.recording {
+            background: #dc3545;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        .record-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .progress-indicator {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        /* Pulse Analysis Display */
+        .live-exchange {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        
+        .pulse-analysis {
+            margin-top: 15px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border: 2px solid #28a745;
+        }
+        
+        .pulse-analysis.low-confidence {
+            border-color: #ffc107;
+            background: #fff3cd;
+        }
+        
+        .analysis-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .analysis-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .confidence-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .confidence-badge.high {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .confidence-badge.low {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .transcript-section {
+            margin-bottom: 20px;
+        }
+        
+        .section-label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .transcript-text {
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+            font-style: italic;
+            color: #333;
+        }
+        
+        .emotion-bar-chart {
+            margin-bottom: 20px;
+        }
+        
+        .emotion-item {
+            margin: 10px 0;
+        }
+        
+        .emotion-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        
+        .emotion-bar-container {
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .emotion-bar {
+            height: 100%;
+            transition: width 0.5s ease;
+            border-radius: 10px;
+        }
+        
+        .emotion-bar.positive {
+            background: linear-gradient(90deg, #28a745, #20c997);
+        }
+        
+        .emotion-bar.negative {
+            background: linear-gradient(90deg, #dc3545, #c82333);
+        }
+        
+        .emotion-bar.neutral {
+            background: linear-gradient(90deg, #ffc107, #ff9800);
+        }
+        
+        .speech-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-item {
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .conversational-signals {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .signal-item {
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+        
+        .signal-label {
+            color: #666;
+            margin-bottom: 3px;
+        }
+        
+        .signal-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        /* Warning and Error Banners */
+        .warning-banner {
+            margin: 20px 0;
+            padding: 20px;
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            color: #856404;
+        }
+        
+        .warning-banner .banner-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .warning-banner .banner-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .banner-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .banner-btn.primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .banner-btn.primary:hover {
+            background: #5568d3;
+        }
+        
+        .banner-btn.secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .banner-btn.secondary:hover {
+            background: #f5f5f5;
+        }
+        
+        /* Final Analysis */
+        .final-analysis {
+            margin-top: 30px;
+            padding: 30px;
+            background: linear-gradient(135deg, #f9f9f9 0%, #e3f2fd 100%);
+            border-radius: 12px;
+            border: 3px solid #667eea;
+        }
+        
+        .final-analysis h2 {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+        
+        .progress-chart {
+            margin: 20px 0;
+        }
+        
+        .progress-item {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #e0e0e0;
+        }
+        
+        .progress-item.on_track {
+            border-left-color: #28a745;
+        }
+        
+        .progress-item.warning {
+            border-left-color: #ffc107;
+        }
+        
+        .progress-item.stuck {
+            border-left-color: #dc3545;
+        }
+        
+        .progress-label {
+            flex: 0 0 120px;
+            font-weight: 600;
+        }
+        
+        .progress-bar-wrapper {
+            flex: 1;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 0 15px;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        
+        .restart-btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .restart-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.4);
+        }
+        
+        /* Phase Indicators */
+        .phase-indicator {
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 15px 0;
+            display: none;
+            transition: opacity 0.3s ease;
+        }
+        
+        .phase-indicator.active {
+            display: block;
+        }
+        
+        .phase-indicator.ai-speaking {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            color: #1976d2;
+            border: 2px solid #1976d2;
+            animation: pulse-blue 2s ease-in-out infinite;
+        }
+        
+        .phase-indicator.listening {
+            background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+            color: #c2185b;
+            border: 2px solid #c2185b;
+            animation: pulse-pink 1.5s ease-in-out infinite;
+        }
+        
+        .phase-indicator.analyzing {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            color: #f57c00;
+            border: 2px solid #f57c00;
+        }
+        
+        @keyframes pulse-blue {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.02); }
+        }
+        
+        @keyframes pulse-pink {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.9; transform: scale(1.03); }
+        }
+        
+        .audio-visualizer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            margin-top: 10px;
+        }
+        
+        .audio-visualizer .bar {
+            width: 4px;
+            background: #c2185b;
+            border-radius: 2px;
+            animation: waveform 0.6s ease-in-out infinite;
+        }
+        
+        .audio-visualizer .bar:nth-child(1) { height: 15px; animation-delay: 0s; }
+        .audio-visualizer .bar:nth-child(2) { height: 25px; animation-delay: 0.15s; }
+        .audio-visualizer .bar:nth-child(3) { height: 35px; animation-delay: 0.3s; }
+        .audio-visualizer .bar:nth-child(4) { height: 25px; animation-delay: 0.45s; }
+        .audio-visualizer .bar:nth-child(5) { height: 15px; animation-delay: 0.6s; }
+        
+        @keyframes waveform {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1.2); }
+        }
+        
+        .analyzing-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(245, 124, 0, 0.3);
+            border-top-color: #f57c00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 AsyncStandup Voice Demo</h1>
+            <p>Hear AI-powered stuck detection in action</p>
+        </div>
+        
+        <div class="content">
+            <!-- Mode Selection -->
+            <div class="mode-selector">
+                <label>Select Mode:</label>
+                <div class="mode-options">
+                    <div class="mode-option">
+                        <input type="radio" id="mode-demo" name="mode" value="demo" checked>
+                        <label for="mode-demo">🎭 Demo Mode<br><small>Pre-generated AI conversations</small></label>
+                    </div>
+                    <div class="mode-option">
+                        <input type="radio" id="mode-live" name="mode" value="live">
+                        <label for="mode-live">🎤 Live Mode<br><small>Record your own standup</small></label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Demo Mode Controls -->
+            <div id="demo-controls">
+                <div class="persona-selector">
+                    <label for="persona-select">Select Persona:</label>
+                    <select id="persona-select">
+                        <option value="">Loading personas...</option>
+                    </select>
+                    <div id="persona-description" class="persona-description" style="display: none;"></div>
+                </div>
+                
+                <button id="generate-btn" class="generate-btn" disabled>
+                    Generate & Play Voice Demo
+                </button>
+            </div>
+            
+            <!-- Live Mode Controls -->
+            <div id="live-controls" class="live-controls">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="start-standup-btn" class="start-standup-btn" style="flex: 1;">
+                        🎤 Start My Standup
+                    </button>
+                    <button onclick="viewPreviousStandups()" class="start-standup-btn" style="flex: 0 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        📁 View History
+                    </button>
+                </div>
+                
+                <div id="live-session" class="live-session">
+                    <div class="progress-indicator" id="live-progress">Question 1 of 5</div>
+                    
+                    <!-- Phase Indicator -->
+                    <div id="phase-indicator" class="phase-indicator"></div>
+                    
+                    <div class="question-display" id="question-display">
+                        <div class="question-text" id="question-text">Loading question...</div>
+                    </div>
+                    
+                    <button id="record-btn" class="record-btn" disabled style="display: none;">
+                        ✋ Done Speaking
+                    </button>
+                    
+                    <div id="live-exchanges-container"></div>
+                </div>
+            </div>
+            
+            <div id="status-box" class="status-box"></div>
+            
+            <div id="playback-container" class="playback-container"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Demo mode state
+        let personas = [];
+        let currentSession = null;
+        let currentAudioIndex = 0;
+        let audioElements = [];
+        
+        // Live mode state
+        let currentMode = 'demo';
+        let liveSessionId = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let currentQuestionNumber = 0;
+        let liveExchanges = [];
+        let currentQuestionAudioUrl = null;
+        let micPermissionGranted = false;
+        
+        // VAD (Voice Activity Detection) state
+        let audioContext = null;
+        let analyser = null;
+        let silenceTimer = null;
+        let vadStream = null;
+        const SILENCE_THRESHOLD = -50; // dB
+        const SILENCE_DURATION = 2000; // 2 seconds
+        
+        // Load personas on page load
+        async function loadPersonas() {
+            try {
+                const response = await fetch('/api/personas');
+                const data = await response.json();
+                personas = data.personas;
+                
+                const select = document.getElementById('persona-select');
+                select.innerHTML = '<option value="">Choose a persona...</option>';
+                
+                personas.forEach(persona => {
+                    const option = document.createElement('option');
+                    option.value = persona.name;
+                    option.textContent = `${persona.name.charAt(0).toUpperCase() + persona.name.slice(1)} - ${persona.archetype}`;
+                    select.appendChild(option);
+                });
+                
+                document.getElementById('generate-btn').disabled = false;
+            } catch (error) {
+                console.error('Error loading personas:', error);
+                showStatus('error', 'Failed to load personas. Please refresh the page.');
+            }
+        }
+        
+        // Show persona description
+        document.getElementById('persona-select').addEventListener('change', (e) => {
+            const personaName = e.target.value;
+            const descDiv = document.getElementById('persona-description');
+            
+            if (personaName) {
+                const persona = personas.find(p => p.name === personaName);
+                if (persona && persona.description) {
+                    descDiv.textContent = persona.description;
+                    descDiv.style.display = 'block';
+                } else {
+                    descDiv.style.display = 'none';
+                }
+            } else {
+                descDiv.style.display = 'none';
+            }
+        });
+        
+        // Generate voice demo
+        document.getElementById('generate-btn').addEventListener('click', async () => {
+            const personaSelect = document.getElementById('persona-select');
+            const persona = personaSelect.value;
+            
+            if (!persona) {
+                alert('Please select a persona');
+                return;
+            }
+            
+            document.getElementById('generate-btn').disabled = true;
+            showStatus('generating', 'Generating voice demo... This will take 2-3 minutes.');
+            document.getElementById('playback-container').classList.remove('active');
+            document.getElementById('playback-container').innerHTML = '';
+            
+            try {
+                // Start generation
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ persona })
+                });
+                
+                const data = await response.json();
+                currentSession = data.session_id;
+                
+                // Poll for completion
+                pollSessionStatus(currentSession);
+            } catch (error) {
+                console.error('Error generating demo:', error);
+                showStatus('error', 'Failed to generate demo. Please try again.');
+                document.getElementById('generate-btn').disabled = false;
+            }
+        });
+        
+        // Poll session status
+        async function pollSessionStatus(sessionId) {
+            try {
+                const response = await fetch(`/api/session/${sessionId}/status`);
+                const data = await response.json();
+                
+                if (data.status === 'complete') {
+                    // Load and display session
+                    await loadSession(sessionId);
+                    showStatus('complete', 'Voice demo ready! Click play buttons to hear the conversation.');
+                    document.getElementById('generate-btn').disabled = false;
+                } else if (data.status === 'generating') {
+                    // Continue polling
+                    setTimeout(() => pollSessionStatus(sessionId), 3000);
+                } else {
+                    showStatus('error', 'Session not found. Please try again.');
+                    document.getElementById('generate-btn').disabled = false;
+                }
+            } catch (error) {
+                console.error('Error polling status:', error);
+                setTimeout(() => pollSessionStatus(sessionId), 3000);
+            }
+        }
+        
+        // Load session data
+        async function loadSession(sessionId) {
+            try {
+                const response = await fetch(`/api/session/${sessionId}`);
+                const data = await response.json();
+                const session = data.session;
+                
+                displaySession(session);
+            } catch (error) {
+                console.error('Error loading session:', error);
+                showStatus('error', 'Failed to load session data.');
+            }
+        }
+        
+        // Display session
+        function displaySession(session) {
+            const container = document.getElementById('playback-container');
+            container.innerHTML = '';
+            container.classList.add('active');
+            
+            let currentDay = 0;
+            
+            session.exchanges.forEach((exchange, idx) => {
+                // Add day header if new day
+                if (exchange.day !== currentDay) {
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = 'day-header';
+                    dayHeader.textContent = `Day ${exchange.day} of 5`;
+                    container.appendChild(dayHeader);
+                    currentDay = exchange.day;
+                }
+                
+                // Create exchange element
+                const exchangeEl = document.createElement('div');
+                exchangeEl.className = 'exchange';
+                
+                // Question
+                exchangeEl.innerHTML += `
+                    <div class="exchange-question">
+                        <div class="speaker-label interviewer">
+                            🔊 AI Interviewer
+                        </div>
+                        <div class="text-content">"${exchange.question_text}"</div>
+                        <div class="audio-controls">
+                            <button class="play-btn" data-audio="/api/audio/${exchange.question_audio_file}" data-type="question">
+                                ▶ Play Question
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // Answer
+                exchangeEl.innerHTML += `
+                    <div class="exchange-answer">
+                        <div class="speaker-label persona">
+                            💬 ${session.persona_name.charAt(0).toUpperCase() + session.persona_name.slice(1)}
+                        </div>
+                        <div class="text-content">"${exchange.answer_text}"</div>
+                        <div class="audio-controls">
+                            <button class="play-btn" data-audio="/api/audio/${exchange.answer_audio_file}" data-type="answer">
+                                ▶ Play Answer
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(exchangeEl);
+            });
+            
+            // Add analysis section
+            displayAnalysis(session.analysis, session.persona_archetype);
+            
+            // Add play button listeners
+            document.querySelectorAll('.play-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => playAudio(e.target));
+            });
+        }
+        
+        // Display analysis
+        function displayAnalysis(analysis, personaArchetype) {
+            const container = document.getElementById('playback-container');
+            
+            const analysisSection = document.createElement('div');
+            analysisSection.className = 'analysis-section';
+            analysisSection.innerHTML = `<h3>📊 Stuck Detection Analysis - ${personaArchetype}</h3>`;
+            
+            Object.keys(analysis).sort().forEach(day => {
+                const dayAnalysis = analysis[day];
+                const status = dayAnalysis.status;
+                const probability = (dayAnalysis.stuck_probability * 100).toFixed(1);
+                
+                const statusEmoji = {
+                    'on_track': '✅',
+                    'warning': '⚠️',
+                    'stuck': '🚨'
+                }[status] || '•';
+                
+                const dayEl = document.createElement('div');
+                dayEl.className = `analysis-day ${status}`;
+                dayEl.innerHTML = `
+                    <strong>Day ${day}:</strong> ${statusEmoji} ${status.toUpperCase().replace('_', ' ')} 
+                    (${probability}% stuck probability)
+                `;
+                
+                analysisSection.appendChild(dayEl);
+            });
+            
+            container.appendChild(analysisSection);
+        }
+        
+        // Play audio
+        function playAudio(button) {
+            const audioUrl = button.getAttribute('data-audio');
+            const audio = new Audio(audioUrl);
+            
+            button.classList.add('playing');
+            button.textContent = '⏸ Playing...';
+            button.disabled = true;
+            
+            audio.play();
+            
+            audio.onended = () => {
+                button.classList.remove('playing');
+                const type = button.getAttribute('data-type');
+                button.textContent = type === 'question' ? '▶ Play Question' : '▶ Play Answer';
+                button.disabled = false;
+            };
+            
+            audio.onerror = () => {
+                button.classList.remove('playing');
+                button.textContent = '❌ Error';
+                button.disabled = false;
+            };
+        }
+        
+        // Show status message
+        function showStatus(type, message) {
+            const statusBox = document.getElementById('status-box');
+            statusBox.className = `status-box ${type}`;
+            statusBox.innerHTML = message;
+            
+            if (type === 'generating') {
+                statusBox.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="loading-spinner"></div>
+                        <div>
+                            ${message}
+                            <div class="progress-text">Generating conversations, creating audio, analyzing patterns...</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Mode switching
+        document.querySelectorAll('input[name="mode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                currentMode = e.target.value;
+                
+                if (currentMode === 'demo') {
+                    document.getElementById('demo-controls').style.display = 'block';
+                    document.getElementById('live-controls').classList.remove('active');
+                    document.getElementById('playback-container').style.display = 'block';
+                } else {
+                    document.getElementById('demo-controls').style.display = 'none';
+                    document.getElementById('live-controls').classList.add('active');
+                    document.getElementById('playback-container').style.display = 'none';
+                }
+            });
+        });
+        
+        // ====== LIVE MODE: Microphone Recording ======
+        
+        // Request microphone access
+        async function requestMicrophoneAccess() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                micPermissionGranted = true;
+                return stream;
+            } catch (error) {
+                console.error('Microphone access denied:', error);
+                micPermissionGranted = false;
+                showStatus('error', '🎤 Microphone access required. Please grant permission in your browser settings.');
+                return null;
+            }
+        }
+        
+        // Setup Voice Activity Detection
+        function setupVAD(stream) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                
+                analyser.fftSize = 2048;
+                const bufferLength = analyser.fftSize;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                vadStream = stream;
+                
+                // Monitor audio levels
+                function checkAudioLevel() {
+                    if (!isRecording) return;
+                    
+                    analyser.getByteTimeDomainData(dataArray);
+                    
+                    // Calculate RMS (Root Mean Square) for audio level
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        const normalized = (dataArray[i] - 128) / 128;
+                        sum += normalized * normalized;
+                    }
+                    const rms = Math.sqrt(sum / bufferLength);
+                    const db = 20 * Math.log10(rms);
+                    
+                    // Check if silent
+                    if (db < SILENCE_THRESHOLD) {
+                        if (!silenceTimer) {
+                            // Start silence timer
+                            silenceTimer = setTimeout(() => {
+                                console.log('Auto-stopping due to silence');
+                                stopRecording();
+                            }, SILENCE_DURATION);
+                        }
+                    } else {
+                        // Reset timer if sound detected
+                        if (silenceTimer) {
+                            clearTimeout(silenceTimer);
+                            silenceTimer = null;
+                        }
+                    }
+                    
+                    // Continue monitoring
+                    requestAnimationFrame(checkAudioLevel);
+                }
+                
+                checkAudioLevel();
+            } catch (error) {
+                console.error('VAD setup failed:', error);
+                // VAD not critical, continue without it
+            }
+        }
+        
+        // Cleanup VAD
+        function cleanupVAD() {
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
+            if (audioContext) {
+                audioContext.close().catch(e => console.error('Error closing audio context:', e));
+                audioContext = null;
+            }
+            analyser = null;
+        }
+        
+        // Start recording
+        async function startRecording() {
+            if (isRecording) return;
+            
+            const stream = await requestMicrophoneAccess();
+            if (!stream) return;
+            
+            audioChunks = [];
+            
+            // Setup VAD for auto-stop
+            setupVAD(stream);
+            
+            // Use webm format (browser standard)
+            const options = { mimeType: 'audio/webm' };
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                // Fallback for Safari
+                mediaRecorder = new MediaRecorder(stream);
+            }
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+            
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                
+                // Cleanup VAD
+                cleanupVAD();
+                
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Validate recording duration (at least 2 seconds)
+                if (audioBlob.size < 10000) { // Rough size check
+                    showStatus('error', 'Recording too short. Please speak for at least 3 seconds.');
+                    resetRecordButton();
+                    hidePhaseIndicator();
+                    return;
+                }
+                
+                // Show analyzing phase
+                hidePhaseIndicator();
+                showPhaseIndicator('analyzing');
+                
+                // Upload and analyze
+                await uploadAndAnalyze(audioBlob);
+            };
+            
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // Show listening indicator
+            showPhaseIndicator('listening');
+            
+            // Update button UI - show manual override
+            const recordBtn = document.getElementById('record-btn');
+            recordBtn.textContent = '✋ Done Speaking';
+            recordBtn.classList.add('recording');
+            recordBtn.style.display = 'block';
+            recordBtn.disabled = false;
+        }
+        
+        // Stop recording
+        function stopRecording() {
+            if (!isRecording || !mediaRecorder) return;
+            
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            // Cleanup VAD
+            cleanupVAD();
+            
+            // Hide button during processing
+            const recordBtn = document.getElementById('record-btn');
+            recordBtn.style.display = 'none';
+            recordBtn.classList.remove('recording');
+        }
+        
+        // Reset record button (for errors)
+        function resetRecordButton() {
+            const recordBtn = document.getElementById('record-btn');
+            recordBtn.style.display = 'none';
+            recordBtn.classList.remove('recording');
+            recordBtn.disabled = true;
+        }
+        
+        // Handle record button click for manual stop
+        document.getElementById('record-btn').addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+        
+        // ====== LIVE MODE: Session Flow ======
+        
+        // Start live standup
+        document.getElementById('start-standup-btn').addEventListener('click', async () => {
+            await startLiveStandup();
+        });
+        
+        async function startLiveStandup() {
+            try {
+                // Reset state
+                currentQuestionNumber = 0;
+                liveExchanges = [];
+                document.getElementById('live-exchanges-container').innerHTML = '';
+                
+                // Show loading
+                document.getElementById('start-standup-btn').disabled = true;
+                showStatus('generating', 'Starting your standup session...');
+                
+                // Call backend to start session
+                const response = await fetch('/api/interactive/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to start session');
+                }
+                
+                const data = await response.json();
+                liveSessionId = data.session_id;
+                currentQuestionAudioUrl = data.question_audio_url;
+                
+                // Show session UI
+                document.getElementById('live-session').classList.add('active');
+                document.getElementById('question-text').textContent = data.question_text;
+                document.getElementById('live-progress').textContent = `Question ${currentQuestionNumber + 1} of 5`;
+                
+                // Enable recording
+                document.getElementById('record-btn').disabled = false;
+                
+                // Auto-play question
+                playQuestionAudio(currentQuestionAudioUrl);
+                
+                showStatus('complete', '✅ Session started! Answer when AI finishes speaking.');
+            } catch (error) {
+                console.error('Error starting standup:', error);
+                showStatus('error', 'Failed to start standup session. Please try again.');
+                document.getElementById('start-standup-btn').disabled = false;
+            }
+        }
+        
+        // Upload and analyze audio
+        async function uploadAndAnalyze(audioBlob) {
+            try {
+                showStatus('generating', 'Analyzing your response...');
+                
+                // Create form data
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+                formData.append('session_id', liveSessionId);
+                formData.append('question_number', currentQuestionNumber);
+                
+                // Upload to backend
+                const response = await fetch('/api/interactive/record', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Analysis failed');
+                }
+                
+                const data = await response.json();
+                
+                // Add current question text to data for display
+                data.question_text = document.getElementById('question-text').textContent;
+                
+                // Store exchange
+                liveExchanges.push(data);
+                
+                // Display analysis
+                displayPulseAnalysis(data);
+                
+                // Check status
+                if (data.status === 'low_confidence') {
+                    showLowConfidenceWarning(data);
+                } else if (data.is_complete) {
+                    // Standup complete - save and show final analysis
+                    await saveInteractiveSession();
+                    showStatus('complete', '✅ Standup complete! Results saved.');
+                    displayFinalAnalysis();
+                    document.getElementById('record-btn').disabled = true;
+                    document.getElementById('live-session').classList.remove('active');
+                } else {
+                    // Continue to next question
+                    currentQuestionNumber++;
+                    currentQuestionAudioUrl = data.next_question_audio_url;
+                    
+                    // Update UI
+                    document.getElementById('question-text').textContent = data.next_question;
+                    document.getElementById('live-progress').textContent = `Question ${currentQuestionNumber + 1} of 5`;
+                    
+                    // Hide phase indicator between exchanges
+                    hidePhaseIndicator();
+                    
+                    // Auto-play next question (will auto-start recording)
+                    playQuestionAudio(currentQuestionAudioUrl);
+                }
+            } catch (error) {
+                console.error('Error analyzing audio:', error);
+                showStatus('error', `Analysis failed: ${error.message}`);
+                resetRecordButton();
+            }
+        }
+        
+        // ====== LIVE MODE: Phase Indicators ======
+        
+        function showPhaseIndicator(phase) {
+            const indicator = document.getElementById('phase-indicator');
+            
+            // Set content based on phase
+            let content = '';
+            if (phase === 'ai-speaking') {
+                content = '🤖 AI is speaking...';
+            } else if (phase === 'listening') {
+                content = `
+                    🎤 Listening...
+                    <div class="audio-visualizer">
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                    </div>
+                `;
+            } else if (phase === 'analyzing') {
+                content = '⏳ Analyzing your response...<span class="analyzing-spinner"></span>';
+            }
+            
+            indicator.innerHTML = content;
+            indicator.className = `phase-indicator ${phase} active`;
+        }
+        
+        function hidePhaseIndicator() {
+            const indicator = document.getElementById('phase-indicator');
+            indicator.classList.remove('active', 'ai-speaking', 'listening', 'analyzing');
+        }
+        
+        // ====== LIVE MODE: Play Question Audio with Auto-Start ======
+        
+        // Play question audio
+        function playQuestionAudio(audioUrl) {
+            if (!audioUrl) return;
+            
+            // Show AI speaking indicator
+            showPhaseIndicator('ai-speaking');
+            
+            const audio = new Audio(audioUrl);
+            audio.play().catch(e => {
+                console.error('Error playing question audio:', e);
+                hidePhaseIndicator();
+            });
+            
+            // Auto-start recording when AI finishes
+            audio.onended = () => {
+                hidePhaseIndicator();
+                
+                // Wait 200ms then auto-start recording
+                setTimeout(() => {
+                    startRecording();
+                }, 200);
+            };
+            
+            audio.onerror = () => {
+                console.error('Error loading question audio');
+                hidePhaseIndicator();
+            };
+        }
+        
+        // Reset live mode
+        function resetLiveMode() {
+            currentQuestionNumber = 0;
+            liveExchanges = [];
+            liveSessionId = null;
+            currentQuestionAudioUrl = null;
+            
+            document.getElementById('live-session').classList.remove('active');
+            document.getElementById('live-exchanges-container').innerHTML = '';
+            document.getElementById('start-standup-btn').disabled = false;
+            resetRecordButton();
+        }
+        
+        // ====== LIVE MODE: Display Functions ======
+        
+        // Display Pulse analysis
+        function displayPulseAnalysis(data) {
+            const container = document.getElementById('live-exchanges-container');
+            
+            // Create exchange element
+            const exchangeEl = document.createElement('div');
+            exchangeEl.className = 'live-exchange';
+            
+            // Question
+            exchangeEl.innerHTML = `
+                <div class="exchange-question">
+                    <div class="speaker-label interviewer">🔊 AI Interviewer</div>
+                    <div class="text-content">"${data.question_text || document.getElementById('question-text').textContent}"</div>
+                </div>
+            `;
+            
+            // Analysis
+            const isLowConfidence = data.analysis.pulse_analysis.confidence < 0.7;
+            const analysisHTML = `
+                <div class="pulse-analysis ${isLowConfidence ? 'low-confidence' : ''}">
+                    <div class="analysis-header">
+                        <div class="analysis-title">📊 Your Response Analysis</div>
+                        <div class="confidence-badge ${isLowConfidence ? 'low' : 'high'}">
+                            ${(data.analysis.pulse_analysis.confidence * 100).toFixed(0)}% Confidence
+                        </div>
+                    </div>
+                    
+                    <!-- Transcript -->
+                    <div class="transcript-section">
+                        <div class="section-label">📝 Transcript</div>
+                        <div class="transcript-text">"${data.analysis.pulse_analysis.transcript}"</div>
+                    </div>
+                    
+                    <!-- Emotions -->
+                    <div class="emotion-bar-chart">
+                        <div class="section-label">😀 Emotions Detected</div>
+                        ${renderEmotionBars(data.analysis.pulse_analysis.emotions)}
+                    </div>
+                    
+                    <!-- Speech Metrics -->
+                    <div class="speech-metrics">
+                        <div class="section-label" style="grid-column: 1 / -1;">🗣️ Speech Patterns</div>
+                        <div class="metric-item">
+                            <div class="metric-label">Filler Words</div>
+                            <div class="metric-value">${data.analysis.speech_patterns.filler_word_count}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Speech Rate</div>
+                            <div class="metric-value">${data.analysis.speech_patterns.speech_rate_wpm} wpm</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Hesitation</div>
+                            <div class="metric-value">${(data.analysis.speech_patterns.hesitation_score * 100).toFixed(0)}%</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Conversational Signals -->
+                    <div class="conversational-signals">
+                        <div class="section-label" style="grid-column: 1 / -1;">💬 Conversational Signals</div>
+                        <div class="signal-item">
+                            <div class="signal-label">Vagueness</div>
+                            <div class="signal-value">${(data.analysis.conversational_signals.vagueness * 100).toFixed(0)}%</div>
+                        </div>
+                        <div class="signal-item">
+                            <div class="signal-label">Hedging Words</div>
+                            <div class="signal-value">${data.analysis.conversational_signals.hedging_count}</div>
+                        </div>
+                        <div class="signal-item">
+                            <div class="signal-label">Specificity</div>
+                            <div class="signal-value">${(data.analysis.conversational_signals.specificity * 100).toFixed(0)}%</div>
+                        </div>
+                        <div class="signal-item">
+                            <div class="signal-label">Help Seeking</div>
+                            <div class="signal-value">${data.analysis.conversational_signals.help_seeking ? '✅ Yes' : '❌ No'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            exchangeEl.innerHTML += analysisHTML;
+            container.appendChild(exchangeEl);
+            
+            // Scroll to bottom
+            exchangeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        // Render emotion bars
+        function renderEmotionBars(emotions) {
+            const emotionConfig = [
+                { key: 'happiness', label: 'Happiness', type: 'positive' },
+                { key: 'excitement', label: 'Excitement', type: 'positive' },
+                { key: 'sadness', label: 'Sadness', type: 'negative' },
+                { key: 'frustration', label: 'Frustration', type: 'negative' },
+                { key: 'anxiety', label: 'Anxiety', type: 'neutral' }
+            ];
+            
+            return emotionConfig.map(config => {
+                const value = emotions[config.key] || 0;
+                const percentage = (value * 100).toFixed(0);
+                
+                return `
+                    <div class="emotion-item">
+                        <div class="emotion-label">
+                            <span>${config.label}</span>
+                            <span>${percentage}%</span>
+                        </div>
+                        <div class="emotion-bar-container">
+                            <div class="emotion-bar ${config.type}" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // ====== LIVE MODE: Error Handling ======
+        
+        // Show low confidence warning
+        function showLowConfidenceWarning(data) {
+            const confidence = (data.analysis.pulse_analysis.confidence * 100).toFixed(0);
+            
+            const warningHTML = `
+                <div class="warning-banner" id="low-confidence-warning">
+                    <div class="banner-title">⚠️ Low Confidence (${confidence}%)</div>
+                    <div>The transcript may be inaccurate. You can retry or continue anyway.</div>
+                    <div class="banner-actions">
+                        <button class="banner-btn secondary" onclick="retryRecording()">🔄 Re-record Answer</button>
+                        <button class="banner-btn primary" onclick="continueAnyway()">➡️ Continue Anyway</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('live-exchanges-container').insertAdjacentHTML('beforeend', warningHTML);
+            resetRecordButton();
+        }
+        
+        // Retry recording
+        window.retryRecording = function() {
+            // Remove warning banner
+            const warning = document.getElementById('low-confidence-warning');
+            if (warning) warning.remove();
+            
+            // Remove last exchange (low confidence one)
+            const container = document.getElementById('live-exchanges-container');
+            const lastExchange = container.lastElementChild;
+            if (lastExchange && lastExchange.classList.contains('live-exchange')) {
+                lastExchange.remove();
+            }
+            
+            // Remove from exchanges array
+            liveExchanges.pop();
+            
+            // Replay question
+            playQuestionAudio(currentQuestionAudioUrl);
+            
+            showStatus('complete', '🔄 Ready to retry! Click "Start Recording" when ready.');
+        };
+        
+        // Continue anyway
+        window.continueAnyway = function() {
+            // Remove warning banner
+            const warning = document.getElementById('low-confidence-warning');
+            if (warning) warning.remove();
+            
+            // Get last exchange data
+            const lastData = liveExchanges[liveExchanges.length - 1];
+            
+            // Check if complete
+            if (currentQuestionNumber >= 4) {
+                showStatus('complete', '✅ Standup complete!');
+                displayFinalAnalysis();
+            } else {
+                // Continue to next question
+                currentQuestionNumber++;
+                
+                // Generate next question (simplified - in real app would call backend)
+                // For now, just show a placeholder
+                document.getElementById('question-text').textContent = 'Next question will be generated...';
+                document.getElementById('live-progress').textContent = `Question ${currentQuestionNumber + 1} of 5`;
+                
+                resetRecordButton();
+                showStatus('complete', '✅ Continuing! Answer the next question when ready.');
+            }
+        };
+        
+        // ====== LIVE MODE: Final Analysis ======
+        
+        // Display final analysis
+        function displayFinalAnalysis() {
+            console.log('displayFinalAnalysis called');
+            console.log('liveExchanges:', liveExchanges);
+            
+            const container = document.getElementById('live-exchanges-container');
+            
+            // Calculate stuck probabilities for each exchange
+            const progressData = liveExchanges.map((exchange, idx) => {
+                // Simple stuck probability calculation
+                const vagueness = exchange.analysis.conversational_signals.vagueness;
+                const hedging = exchange.analysis.conversational_signals.hedging_count / 20; // Normalize
+                const sadness = exchange.analysis.pulse_analysis.emotions.sadness || 0;
+                const frustration = exchange.analysis.pulse_analysis.emotions.frustration || 0;
+                
+                const conversationalScore = (vagueness * 0.6 + hedging * 0.4);
+                const emotionalScore = (sadness + frustration) / 2;
+                const stuckProbability = conversationalScore * 0.7 + emotionalScore * 0.3;
+                
+                let status = 'on_track';
+                if (stuckProbability > 0.7) status = 'stuck';
+                else if (stuckProbability > 0.4) status = 'warning';
+                
+                return {
+                    exchange: idx + 1,
+                    stuckProbability,
+                    status
+                };
+            });
+            
+            // Get final status
+            const finalProb = progressData[progressData.length - 1];
+            const statusEmoji = {
+                'on_track': '✅',
+                'warning': '⚠️',
+                'stuck': '🚨'
+            }[finalProb.status];
+            
+            const finalHTML = `
+                <div class="final-analysis">
+                    <h2>🎯 Final Stuck Detection Analysis</h2>
+                    
+                    <div class="progress-chart">
+                        ${progressData.map(item => `
+                            <div class="progress-item ${item.status}">
+                                <div class="progress-label">Exchange ${item.exchange}</div>
+                                <div class="progress-bar-wrapper">
+                                    <div class="progress-bar-fill" style="width: ${(item.stuckProbability * 100).toFixed(0)}%">
+                                        ${(item.stuckProbability * 100).toFixed(0)}%
+                                    </div>
+                                </div>
+                                <div style="font-weight: 600;">${item.status.replace('_', ' ').toUpperCase()}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div style="text-align: center; font-size: 24px; margin: 20px 0; font-weight: 600;">
+                        ${statusEmoji} Final Status: ${finalProb.status.replace('_', ' ').toUpperCase()}
+                    </div>
+                    
+                    <button class="restart-btn" onclick="restartStandup()">
+                        🔄 Start New Standup
+                    </button>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', finalHTML);
+            
+            // Scroll to final analysis
+            container.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        // Save interactive session
+        async function saveInteractiveSession() {
+            try {
+                const formData = new FormData();
+                formData.append('session_id', liveSessionId);
+                formData.append('exchanges', JSON.stringify(liveExchanges));
+                
+                const response = await fetch('/api/interactive/save', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    console.log('Session saved successfully');
+                } else {
+                    console.error('Failed to save session');
+                }
+            } catch (error) {
+                console.error('Error saving session:', error);
+            }
+        }
+        
+        // View previous standups
+        window.viewPreviousStandups = async function() {
+            try {
+                const response = await fetch('/api/interactive/sessions');
+                const data = await response.json();
+                
+                if (data.sessions.length === 0) {
+                    alert('No previous standups found!');
+                    return;
+                }
+                
+                // Create modal to show previous sessions
+                let html = '<div style="max-height: 400px; overflow-y: auto;">';
+                html += '<h3>Your Previous Standups</h3>';
+                html += '<ul style="list-style: none; padding: 0;">';
+                
+                data.sessions.forEach(session => {
+                    const date = new Date(session.created_at).toLocaleString();
+                    const statusEmoji = {
+                        'on_track': '✅',
+                        'warning': '⚠️',
+                        'stuck': '🚨'
+                    }[session.final_status] || '❓';
+                    
+                    html += `
+                        <li style="padding: 10px; margin: 5px 0; background: #f5f5f5; border-radius: 6px; cursor: pointer;"
+                            onclick="loadPreviousSession('${session.session_id}')">
+                            ${statusEmoji} ${date} - ${session.exchange_count} exchanges - ${session.final_status.toUpperCase()}
+                        </li>
+                    `;
+                });
+                
+                html += '</ul></div>';
+                
+                // Simple modal display (you could enhance this)
+                const modal = document.createElement('div');
+                modal.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 50px rgba(0,0,0,0.3); z-index: 1000; max-width: 600px;';
+                modal.innerHTML = html + '<button onclick="this.parentElement.remove()" style="margin-top: 20px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">Close</button>';
+                document.body.appendChild(modal);
+                
+            } catch (error) {
+                console.error('Error loading previous standups:', error);
+                alert('Failed to load previous standups');
+            }
+        };
+        
+        // Load a previous session
+        window.loadPreviousSession = async function(sessionId) {
+            try {
+                const response = await fetch(`/api/interactive/session/${sessionId}`);
+                const data = await response.json();
+                
+                // Load the session data
+                liveExchanges = data.session.exchanges;
+                liveSessionId = sessionId;
+                
+                // Clear and rebuild the exchanges display
+                const container = document.getElementById('live-exchanges-container');
+                container.innerHTML = '';
+                
+                // Display each exchange
+                liveExchanges.forEach(exchange => {
+                    displayPulseAnalysis(exchange);
+                });
+                
+                // Display final analysis
+                displayFinalAnalysis();
+                
+                // Close the modal
+                const modal = document.querySelector('div[style*="position: fixed"]');
+                if (modal) modal.remove();
+                
+                // Switch to live mode view
+                document.getElementById('mode-live').checked = true;
+                switchMode();
+                
+                showStatus('complete', '✅ Previous standup loaded!');
+                
+            } catch (error) {
+                console.error('Error loading session:', error);
+                alert('Failed to load session');
+            }
+        };
+        
+        // Restart standup
+        window.restartStandup = function() {
+            resetLiveMode();
+            showStatus('complete', '🔄 Ready to start a new standup!');
+        };
+        
+        // Load personas on page load
+        loadPersonas();
+    </script>
+</body>
+</html>
