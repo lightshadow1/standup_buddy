@@ -153,10 +153,11 @@ def calculate_stuck_probability(
     
     Formula:
         conversational_score = (
-            vagueness * 0.3 +
-            (1 - specificity) * 0.3 +
+            vagueness * 0.25 +
+            (1 - specificity) * 0.25 +
             (hedging / 20) * 0.2 +  # Normalize hedging count
-            (0 if help_seeking else 1) * 0.2
+            (0 if help_seeking else 1) * 0.2 +
+            (1 if overconfident_pattern else 0) * 0.1  # NEW: Overconfident penalty
         )
         
         emotional_score = (
@@ -174,7 +175,8 @@ def calculate_stuck_probability(
     
     Args:
         conversational_signals: Dict with vagueness_score, hedging_count, 
-                               specificity_score, help_seeking, progress_indicators
+                               specificity_score, help_seeking, progress_indicators,
+                               overconfident_pattern (optional)
         emotions: Dict with emotion percentages from Pulse API
         conversational_weight: Weight for conversational signals (default: 0.7)
         emotional_weight: Weight for emotional signals (default: 0.3)
@@ -197,22 +199,29 @@ def calculate_stuck_probability(
         specificity = conversational_signals.get('specificity_score', 1.0)
         hedging_count = conversational_signals.get('hedging_count', 0)
         help_seeking = conversational_signals.get('help_seeking', True)
+        overconfident_pattern = conversational_signals.get('overconfident_pattern', False)
         
         # Normalize hedging (cap at 20 for score calculation)
         hedging_normalized = min(hedging_count / 20.0, 1.0)
         
+        # Apply overconfident penalty - this catches engineers who sound specific
+        # but are stuck due to wrong direction or repeated tasks
+        overconfident_penalty = 1.0 if overconfident_pattern else 0.0
+        
         conversational_score = (
-            vagueness * 0.3 +
-            (1 - specificity) * 0.3 +
+            vagueness * 0.25 +
+            (1 - specificity) * 0.25 +
             hedging_normalized * 0.2 +
-            (0.0 if help_seeking else 1.0) * 0.2
+            (0.0 if help_seeking else 1.0) * 0.2 +
+            overconfident_penalty * 0.1
         )
         
         breakdown['conversational'] = {
             'vagueness': vagueness,
             'lack_of_specificity': 1 - specificity,
             'hedging': hedging_normalized,
-            'avoiding_help': 0.0 if help_seeking else 1.0
+            'avoiding_help': 0.0 if help_seeking else 1.0,
+            'overconfident_pattern': overconfident_penalty
         }
     
     # Calculate emotional score

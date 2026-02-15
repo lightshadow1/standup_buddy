@@ -765,6 +765,162 @@ const SILENCE_DURATION = 2000;  // milliseconds
   - After: Run in parallel = ~2-3s total
   - Benefit: ~1-2s saved per exchange
 
+### Phase 7: AI Persona Runner (Completed)
+
+**Goal**: Add automated AI-vs-AI standup mode within Live Mode for demos without microphone input.
+
+**Challenge**: Live Mode required microphone, making it hard to demo repeatedly. Wanted automated conversations using personas but with the same adaptive question system as Live Mode.
+
+**Solution**: "Run AI Persona" tab within Live Mode that automatically generates persona responses and sends them through Pulse API for analysis.
+
+**Implementation**:
+- ✅ **Backend endpoints** (`voice_demo_server.py`)
+  - `POST /api/ai-persona/start` - Initialize session, generate first question
+  - `POST /api/ai-persona/exchange` - Full pipeline: GPT-4 answer → OpenAI TTS → Pulse API → GPT-4 analysis → next question
+  - `generate_persona_answer()` - GPT-4 generates persona-specific responses for Day 1 (single conversation)
+- ✅ **Frontend UI** (`static/voice_demo.html`)
+  - Tab switcher under Live Mode: "Record Your Standup" | "Run AI Persona"
+  - Persona dropdown with descriptions
+  - Automatic execution (no user clicks during conversation)
+  - Phase indicators: AI speaking (blue), analyzing (orange)
+  - Auto-play audio for questions and answers
+- ✅ **Single-day conversation flow**
+  - All 5 exchanges happen on Day 1 (not Day 1-5 progression)
+  - Persona stays in consistent Day 1 state throughout
+  - Questions flow naturally within one standup meeting
+- ✅ **Full Pulse API integration**
+  - TTS audio sent to Pulse for realistic analysis
+  - Same analysis pipeline as Live Mode
+  - Displays transcript, emotions, speech patterns, conversational signals
+- ✅ **Session history integration**
+  - Sessions saved with `session_type: 'ai_persona_runner'`
+  - Viewable in history alongside interactive sessions
+  - Shows 🤖 persona name vs 🎤 "You" for interactive
+
+**Architecture**:
+```
+User selects persona (e.g., Steve)
+    ↓
+POST /api/ai-persona/start
+    ↓
+Generate first question + audio
+    ↓
+Auto-play question → User sees phase indicator
+    ↓
+POST /api/ai-persona/exchange (x5)
+  1. GPT-4 generates Steve's Day 1 answer
+  2. OpenAI TTS (onyx voice, defensive style)
+  3. Send audio to Pulse API
+  4. GPT-4 analyzes conversational signals
+  5. Generate adaptive next question
+  6. Lightning generates question audio
+    ↓
+Display analysis + auto-play next
+    ↓
+Repeat for 5 exchanges
+    ↓
+Show final stuck probability chart
+```
+
+**Results**:
+- ✅ Full AI-vs-AI automation working
+- ✅ 50-70 seconds per 5-exchange demo
+- ✅ Zero microphone/human input required
+- ✅ Realistic Pulse API analysis (not mocked)
+- ✅ Same adaptive questioning as Live Mode
+- ✅ Session history fully integrated
+
+**User Flow**:
+1. Click "Live Mode" tab
+2. Click "Run AI Persona" sub-tab
+3. Select persona from dropdown (Steve, Sarah, Marcus, Priya, Alex)
+4. Click "▶️ Start AI Standup"
+5. Watch automated conversation (5 exchanges, ~60 seconds)
+6. Review final stuck probability and analysis
+7. Session saved to history automatically
+
+**Cost per run**: ~$0.045-0.08 (GPT-4 + OpenAI TTS) + Smallest.ai Pulse pricing
+
+### Phase 8: Overconfident Pattern Detection & Bug Fixes (Completed)
+
+**Goal**: Fix false negative for Marcus persona and resolve session history loading issues.
+
+#### Issue 1: Marcus Showing 4-8% Instead of Expected 18-45%
+
+**Problem**: Marcus (The Overconfident) was scoring healthy (4-8% stuck) when he should be warning level (18-45%).
+
+**Root Cause**: Conversation analyzer only detected **defensive stuck** (high vagueness), but Marcus is **overconfident stuck** (high specificity but wrong direction).
+
+**Solution**: Added overconfident pattern detection to conversation analyzer.
+
+**Implementation** (`conversation_agent.py` + `insight_engine.py`):
+```python
+# Updated CONVERSATION_ANALYZER_PROMPT
+IMPORTANT - Two types of stuck engineers:
+- DEFENSIVE STUCK: Vague, hedging (HIGH vagueness)
+- OVERCONFIDENT STUCK: Specific, confident, wrong direction (LOW vagueness)
+
+For OVERCONFIDENT pattern, look for:
+- Very detailed technical responses (low vagueness)
+- Same core task mentioned without completion
+- No help-seeking despite lack of progress
+- Confident language ("definitely", "clearly")
+
+Return: {"overconfident_pattern": boolean}
+
+# Updated calculate_stuck_probability()
+conversational_score = (
+    vagueness * 0.25 +                        # Reduced weight
+    (1 - specificity) * 0.25 +                # Reduced weight
+    (hedging / 20) * 0.2 +
+    (0 if help_seeking else 1) * 0.2 +
+    (1 if overconfident_pattern else 0) * 0.1  # NEW: 10% penalty
+)
+```
+
+**Results**:
+- Marcus now correctly scores **~25-45%** (warning zone)
+- System detects repeated tasks despite high specificity
+- Distinguishes between healthy progress (Priya) and overconfident stuck (Marcus)
+
+**Documentation**: Created `OVERCONFIDENT_PATTERN_FIX.md` with full explanation.
+
+#### Issue 2: Session History Loading Failures
+
+**Problems Fixed**:
+
+1. **"Failed to load session" error**
+   - Sessions with `session_type: 'ai_persona_runner'` rejected by history endpoint
+   - **Fix**: Updated `/api/interactive/sessions` to accept both `interactive` and `ai_persona_runner` types
+   - Added `session_type` and `persona_name` to response
+
+2. **Empty display after "Previous standup loaded!" message**
+   - `#live-session` container was `display: none` by default
+   - **Fix**: Added `document.getElementById('live-session').classList.add('active')` when loading session
+
+3. **JavaScript error: "switchMode is not defined"**
+   - Function didn't exist, causing load failure
+   - **Fix**: Removed unnecessary `switchMode()` call (user already in Live Mode)
+
+4. **Missing question_text fallback**
+   - Code tried to access `document.getElementById('question-text')` which didn't exist for loaded sessions
+   - **Fix**: Changed fallback to `'Question not available'`
+
+5. **Incomplete sessions crashing displayFinalAnalysis()**
+   - Tried to display final chart for sessions with <5 exchanges
+   - **Fix**: Added conditional check for `data.session.final_analysis` before calling `displayFinalAnalysis()`
+
+**Results**:
+- ✅ Both interactive and AI Persona Runner sessions loadable from history
+- ✅ History modal shows 🤖 Steve vs 🎤 You correctly
+- ✅ Incomplete sessions (3/5 exchanges) display properly without final chart
+- ✅ Complete sessions (5/5 exchanges) show full analysis with chart
+- ✅ No JavaScript errors during session loading
+
+**Files Modified**:
+- `voice_demo_server.py` (lines 416-454): Updated session listing and retrieval
+- `static/voice_demo.html` (lines 1604, 1900-1902, 1937-1938, 1947-1951, 1958-1959): Fixed loading and display logic
+
 ## Development Timeline
 
 - **Session 1**: Foundation setup (storage, audio, Pulse API) + 52 tests ✅
@@ -802,8 +958,14 @@ const SILENCE_DURATION = 2000;  // milliseconds
   - Natural conversational flow (auto-start, VAD, phase indicators) ✅
   - Zero-click conversation experience ✅
   - Complete documentation updates ✅
+- **Session 8**:
+  - AI Persona Runner mode implementation ✅
+  - Overconfident pattern detection (Marcus fix) ✅
+  - Single-day conversation flow ✅
+  - Session history bug fixes ✅
+  - Complete integration and testing ✅
 
-**Total**: ~7 sessions, from hybrid detection → voice demo → live interactive mode → portable audio files → bug fixes and history → natural conversational flow
+**Total**: ~8 sessions, from hybrid detection → voice demo → live interactive mode → portable audio files → bug fixes and history → natural conversational flow → AI Persona Runner
 
 ## Team Notes
 

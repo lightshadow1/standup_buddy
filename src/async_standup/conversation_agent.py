@@ -41,6 +41,18 @@ Analyze the conversation and detect these signals:
 3. Specificity: Concrete details vs vague statements
 4. Help-seeking: Whether they're asking for help or isolating
 5. Progress: Clear next steps vs unclear direction
+6. Overconfidence Pattern: High specificity BUT no actual progress (same task, wrong direction)
+
+IMPORTANT - Two types of stuck engineers:
+- DEFENSIVE STUCK: Vague, hedging, avoiding detail (HIGH vagueness score)
+- OVERCONFIDENT STUCK: Specific, confident, but wrong direction (LOW vagueness, but stuck)
+
+For OVERCONFIDENT pattern, look for:
+- Very detailed technical responses (low vagueness)
+- Same core task mentioned without completion
+- No help-seeking despite lack of progress
+- Confident language ("definitely", "clearly", "will work")
+- Missing: completion, moving to new tasks, validating approach
 
 Return a JSON object with:
 {
@@ -48,13 +60,14 @@ Return a JSON object with:
   "hedging_count": integer count of hedging words,
   "specificity_score": 0.0-1.0 (0=no details, 1=very specific),
   "help_seeking": boolean (true if asking/open to help),
-  "progress_indicators": boolean (true if clear next steps),
-  "repeated_task": string or null (task mentioned multiple times),
+  "progress_indicators": boolean (true if clear next steps AND making progress),
+  "repeated_task": string or null (task mentioned multiple times without completion),
+  "overconfident_pattern": boolean (true if high specificity but stuck),
   "signals_detected": [list of specific signals found],
   "summary": "brief analysis"
 }
 
-Be objective and look for patterns, not just keywords."""
+Be objective and look for patterns, not just keywords. HIGH SPECIFICITY alone does NOT mean healthy - check for actual progress."""
 
 
 def generate_conversation(

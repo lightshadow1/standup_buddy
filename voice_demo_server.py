@@ -413,10 +413,13 @@ async def list_interactive_sessions():
                 with open(metadata_file) as f:
                     data = json.load(f)
                 
-                # Only include interactive sessions
-                if data.get('session_type') == 'interactive':
+                # Include both interactive and ai_persona_runner sessions
+                session_type = data.get('session_type')
+                if session_type in ['interactive', 'ai_persona_runner']:
                     sessions.append({
                         'session_id': data['session_id'],
+                        'session_type': session_type,
+                        'persona_name': data.get('persona_name', 'unknown'),
                         'created_at': data['created_at'],
                         'exchange_count': len(data.get('exchanges', [])),
                         'final_status': data.get('final_analysis', {}).get('final_status', 'unknown')
@@ -446,8 +449,9 @@ async def get_interactive_session(session_id: str):
         with open(metadata_file) as f:
             data = json.load(f)
         
-        if data.get('session_type') != 'interactive':
-            raise HTTPException(status_code=400, detail="Not an interactive session")
+        session_type = data.get('session_type')
+        if session_type not in ['interactive', 'ai_persona_runner']:
+            raise HTTPException(status_code=400, detail="Invalid session type")
         
         return {"session": data}
         
@@ -639,8 +643,9 @@ def generate_followup_question(transcript: str, analysis: dict, question_number:
         return None  # End after 5 questions
     
     vagueness = analysis.get('vagueness_score', 0)
+    help_seeking = analysis.get('help_seeking', False)
     
-    # Adaptive questioning based on vagueness
+    # Adaptive questioning based on vagueness and signals
     if question_number == 0:
         # After "What did you work on yesterday?"
         if vagueness > 0.5:
@@ -649,21 +654,358 @@ def generate_followup_question(transcript: str, analysis: dict, question_number:
             return "What are you working on today?"
     
     elif question_number == 1:
+        # After "What are you working on today?" or specificity follow-up
         if vagueness > 0.5:
-            return "What exactly have you tried so far?"
+            return "What specific steps have you tried so far?"
         else:
-            return "Are there any blockers or challenges?"
+            return "Are you facing any blockers or challenges?"
     
     elif question_number == 2:
+        # Vary based on whether they're stuck or progressing
         if vagueness > 0.5:
-            return "Do you need any help or input from the team?"
+            return "Would you like help or input from anyone on the team?"
         else:
-            return "What's your plan for the rest of the day?"
+            return "How confident are you about completing this work?"
     
     elif question_number == 3:
-        return "Anything else you'd like to share?"
+        # Final question - offer support if they seem stuck
+        if vagueness > 0.5 or help_seeking:
+            return "What would help you make progress right now?"
+        else:
+            return "Anything else you'd like to share or need from the team?"
     
     return None
+
+
+# AI Persona Runner endpoints
+
+@app.post("/api/ai-persona/start")
+async def start_ai_persona_standup(persona_name: str = Form(...)):
+    """Start AI persona standup session.
+    
+    Creates session, generates first adaptive question, returns question audio.
+    """
+    try:
+        # Validate persona
+        persona_name_lower = persona_name.lower()
+        try:
+            persona = get_persona(persona_name_lower)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Unknown persona: {persona_name}")
+        
+        # Create session (this creates the directory)
+        session_id = session_manager.create_session(
+            persona_name=persona_name_lower,
+            persona_archetype=persona["archetype"]
+        )
+        
+        # Generate first question (same as interactive mode)
+        first_question = "What did you work on yesterday?"
+        
+        # Generate audio for first question
+        print(f"[AI Persona Runner] Starting {persona_name} session {session_id}")
+        question_audio = generate_interviewer_audio(first_question)
+        
+        # Save audio
+        audio_filename = f"ai_persona_q_{session_id}_0.wav"
+        session_manager.save_audio(session_id, audio_filename, question_audio)
+        
+        # Initialize session metadata
+        import json
+        from datetime import datetime
+        
+        session_data = {
+            'session_id': session_id,
+            'session_type': 'ai_persona_runner',
+            'persona_name': persona_name_lower,
+            'persona_archetype': persona["archetype"],
+            'created_at': datetime.now().isoformat(),
+            'exchanges': [],
+            'current_exchange': 0,
+            'current_question': first_question
+        }
+        
+        # Save initial metadata
+        metadata_file = session_manager.metadata_dir / f"{session_id}.json"
+        with open(metadata_file, 'w') as f:
+            json.dump(session_data, f, indent=2)
+        
+        return {
+            "session_id": session_id,
+            "persona_name": persona_name_lower,
+            "persona_archetype": persona["archetype"],
+            "first_question_text": first_question,
+            "first_question_audio_url": f"/api/audio/{session_id}/{audio_filename}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to start AI persona session: {str(e)}")
+
+
+def generate_persona_answer(
+    persona_name: str,
+    question: str,
+    exchange_number: int,
+    previous_exchanges: list
+) -> str:
+    """Generate persona's answer using GPT-4.
+    
+    All exchanges happen on Day 1 (single standup conversation).
+    """
+    from openai import OpenAI
+    import os
+    
+    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    # Get persona definition
+    persona = get_persona(persona_name)
+    
+    # All exchanges are on Day 1 (single conversation)
+    day = 1
+    
+    # Build context from previous exchanges
+    context = ""
+    if previous_exchanges:
+        context = "\n\nPrevious conversation:\n"
+        for prev in previous_exchanges:
+            context += f"Q: {prev['question_text']}\n"
+            context += f"A: {prev['answer_text']}\n\n"
+    
+    # Create system prompt for single conversation
+    system_prompt = f"""{persona['system_prompt']}
+
+CONTEXT: This is a single standup conversation happening on Day {day}.
+All questions are part of the same standup meeting.
+
+Respond to the standup question in character. Keep your answer to 50-100 words.
+Stay consistent with your Day {day} state as described in your persona.
+"""
+    
+    user_prompt = f"""Question: {question}{context}
+
+Respond as {persona['name']} would, maintaining consistency within this single standup conversation."""
+    
+    response = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.7,
+        max_tokens=200
+    )
+    
+    return response.choices[0].message.content.strip()
+
+
+@app.post("/api/ai-persona/exchange")
+async def execute_ai_exchange(
+    session_id: str = Form(...),
+    exchange_number: int = Form(...)
+):
+    """Execute one AI persona exchange.
+    
+    Steps:
+    1. Load session metadata
+    2. Generate persona answer
+    3. Convert to audio (OpenAI TTS)
+    4. Send to Pulse API
+    5. Analyze with GPT-4
+    6. Generate adaptive next question
+    7. Convert question to audio
+    8. Save and return analysis
+    """
+    try:
+        import json
+        from openai import OpenAI
+        import os
+        
+        openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # Load session metadata
+        metadata_file = session_manager.metadata_dir / f"{session_id}.json"
+        if not metadata_file.exists():
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        with open(metadata_file) as f:
+            session_data = json.load(f)
+        
+        persona_name = session_data['persona_name']
+        current_question = session_data['current_question']
+        previous_exchanges = session_data.get('exchanges', [])
+        
+        print(f"[AI Persona] Exchange {exchange_number + 1} for {persona_name}")
+        
+        # Step 1: Generate persona answer
+        print(f"[AI Persona] Generating answer...")
+        answer_text = generate_persona_answer(
+            persona_name,
+            current_question,
+            exchange_number,
+            previous_exchanges
+        )
+        print(f"[AI Persona] Answer: {answer_text[:100]}...")
+        
+        # Step 2: Convert answer to audio (OpenAI TTS with persona voice)
+        print(f"[AI Persona] Generating audio...")
+        day = 1  # All exchanges are Day 1 (single conversation)
+        answer_audio = generate_persona_audio(answer_text, persona_name, day)
+        answer_filename = f"ai_persona_a_{session_id}_{exchange_number}.mp3"
+        session_manager.save_audio(session_id, answer_filename, answer_audio)
+        answer_audio_url = f"/api/audio/{session_id}/{answer_filename}"
+        
+        # Step 3: Send audio to Pulse API for transcription + emotions
+        print(f"[AI Persona] Analyzing with Pulse API...")
+        audio_path = session_manager.get_audio_path(session_id, answer_filename)
+        pulse_result = process_audio_file(str(audio_path))
+        
+        transcript = pulse_result.get('transcript', answer_text)  # Fallback to original text
+        emotions = pulse_result.get('emotions', {})
+        confidence = pulse_result.get('confidence', 0.95)
+        
+        # Step 4: Analyze with GPT-4 for conversational signals
+        print(f"[AI Persona] Analyzing conversational signals...")
+        analysis_prompt = f"""Analyze this standup response for stuck signals:
+
+"{transcript}"
+
+Return JSON with:
+- vagueness_score (0-1, higher = more vague)
+- hedging_words (list of hedging words found like "um", "like", "I think")
+- specificity_score (0-1, higher = more specific)
+- help_seeking (boolean, true if asking for help or open to assistance)
+- summary (brief 1-line analysis)
+"""
+        
+        analysis_response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You analyze standup conversations for stuck signals. Return only valid JSON."},
+                {"role": "user", "content": analysis_prompt}
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"}
+        )
+        
+        conversational_analysis = json.loads(analysis_response.choices[0].message.content)
+        
+        # Calculate speech patterns
+        hesitation_score = len(conversational_analysis.get('hedging_words', [])) / 20.0
+        hesitation_score = min(hesitation_score, 1.0)
+        word_count = len(transcript.split())
+        estimated_duration = 10
+        speech_rate = (word_count / estimated_duration) * 60
+        
+        # Calculate stuck probability
+        vagueness = conversational_analysis.get('vagueness_score', 0)
+        hedging = len(conversational_analysis.get('hedging_words', [])) / 20
+        sadness = emotions.get('sadness', 0)
+        frustration = emotions.get('frustration', 0)
+        
+        conversational_score = (vagueness * 0.6 + hedging * 0.4)
+        emotional_score = (sadness + frustration) / 2
+        stuck_probability = conversational_score * 0.7 + emotional_score * 0.3
+        
+        # Step 5: Generate adaptive next question
+        is_complete = exchange_number >= 4
+        
+        if not is_complete:
+            print(f"[AI Persona] Generating next question...")
+            next_question = generate_followup_question(
+                transcript,
+                conversational_analysis,
+                exchange_number
+            )
+            
+            # Generate audio for next question
+            question_audio = generate_interviewer_audio(next_question)
+            question_filename = f"ai_persona_q_{session_id}_{exchange_number + 1}.wav"
+            session_manager.save_audio(session_id, question_filename, question_audio)
+            next_question_audio_url = f"/api/audio/{session_id}/{question_filename}"
+        else:
+            next_question = None
+            next_question_audio_url = None
+        
+        # Step 6: Save exchange data
+        exchange_data = {
+            'exchange_number': exchange_number,
+            'question_text': current_question,
+            'answer_text': answer_text,
+            'analysis': {
+                'pulse_analysis': {
+                    'transcript': transcript,
+                    'confidence': confidence,
+                    'emotions': emotions
+                },
+                'speech_patterns': {
+                    'filler_word_count': len(conversational_analysis.get('hedging_words', [])),
+                    'speech_rate_wpm': round(speech_rate),
+                    'hesitation_score': round(hesitation_score, 2)
+                },
+                'conversational_signals': {
+                    'vagueness': vagueness,
+                    'hedging_count': len(conversational_analysis.get('hedging_words', [])),
+                    'specificity': conversational_analysis.get('specificity_score', 0),
+                    'help_seeking': conversational_analysis.get('help_seeking', False)
+                },
+                'stuck_probability': stuck_probability
+            }
+        }
+        
+        session_data['exchanges'].append(exchange_data)
+        session_data['current_exchange'] = exchange_number + 1
+        if next_question:
+            session_data['current_question'] = next_question
+        
+        # If complete, add final analysis
+        if is_complete:
+            progress_data = []
+            for idx, exch in enumerate(session_data['exchanges']):
+                prob = exch['analysis']['stuck_probability']
+                status = 'on_track'
+                if prob > 0.7:
+                    status = 'stuck'
+                elif prob > 0.4:
+                    status = 'warning'
+                
+                progress_data.append({
+                    'exchange': idx + 1,
+                    'stuck_probability': prob,
+                    'status': status
+                })
+            
+            session_data['final_analysis'] = {
+                'progress': progress_data,
+                'final_status': progress_data[-1]['status']
+            }
+        
+        # Save updated metadata
+        with open(metadata_file, 'w') as f:
+            json.dump(session_data, f, indent=2)
+        
+        print(f"[AI Persona] Exchange {exchange_number + 1} complete")
+        
+        # Return response
+        return {
+            "status": "success",
+            "answer_text": answer_text,
+            "answer_audio_url": answer_audio_url,
+            "analysis": exchange_data['analysis'],
+            "next_question": next_question,
+            "next_question_audio_url": next_question_audio_url,
+            "is_complete": is_complete
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"AI persona exchange failed: {str(e)}")
 
 
 # Health check

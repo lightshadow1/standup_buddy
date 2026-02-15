@@ -848,13 +848,46 @@
             
             <!-- Live Mode Controls -->
             <div id="live-controls" class="live-controls">
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button id="start-standup-btn" class="start-standup-btn" style="flex: 1;">
-                        🎤 Start My Standup
+                <!-- Live Mode Tabs -->
+                <div class="live-mode-tabs" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button id="tab-record" class="tab-button active" onclick="switchLiveTab('record')" style="flex: 1; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s;">
+                        🎤 Record Your Standup
                     </button>
-                    <button onclick="viewPreviousStandups()" class="start-standup-btn" style="flex: 0 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                        📁 View History
+                    <button id="tab-ai-persona" class="tab-button" onclick="switchLiveTab('ai-persona')" style="flex: 1; padding: 12px; background: white; color: #667eea; border: 2px solid #667eea; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s;">
+                        🤖 Run AI Persona
                     </button>
+                </div>
+                
+                <!-- Record Your Standup Tab -->
+                <div id="record-tab-content" class="tab-content">
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button id="start-standup-btn" class="start-standup-btn" style="flex: 1;">
+                            🎤 Start My Standup
+                        </button>
+                        <button onclick="viewPreviousStandups()" class="start-standup-btn" style="flex: 0 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            📁 View History
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- AI Persona Runner Tab -->
+                <div id="ai-persona-tab-content" class="tab-content" style="display: none;">
+                    <div class="persona-selector">
+                        <label for="ai-persona-select">Select AI Persona:</label>
+                        <select id="ai-persona-select">
+                            <option value="">Choose a persona...</option>
+                        </select>
+                        <div id="ai-persona-description" class="persona-description" style="display: none;"></div>
+                    </div>
+                    <button id="start-ai-persona-btn" class="start-standup-btn" disabled>
+                        ▶️ Start AI Standup
+                    </button>
+                    
+                    <div id="ai-persona-session" class="live-session" style="display: none;">
+                        <div class="progress-indicator" id="ai-progress">Question 1 of 5</div>
+                        <div id="ai-phase-indicator" class="phase-indicator"></div>
+                        <div id="ai-exchanges-container"></div>
+                    </div>
                 </div>
                 
                 <div id="live-session" class="live-session">
@@ -1568,10 +1601,11 @@
             exchangeEl.className = 'live-exchange';
             
             // Question
+            const questionText = data.question_text || 'Question not available';
             exchangeEl.innerHTML = `
                 <div class="exchange-question">
                     <div class="speaker-label interviewer">🔊 AI Interviewer</div>
-                    <div class="text-content">"${data.question_text || document.getElementById('question-text').textContent}"</div>
+                    <div class="text-content">"${questionText}"</div>
                 </div>
             `;
             
@@ -1863,10 +1897,15 @@
                         'stuck': '🚨'
                     }[session.final_status] || '❓';
                     
+                    // Show persona name for AI runner, "You" for interactive
+                    const participant = session.session_type === 'ai_persona_runner' 
+                        ? `🤖 ${session.persona_name.charAt(0).toUpperCase() + session.persona_name.slice(1)}`
+                        : '🎤 You';
+                    
                     html += `
                         <li style="padding: 10px; margin: 5px 0; background: #f5f5f5; border-radius: 6px; cursor: pointer;"
                             onclick="loadPreviousSession('${session.session_id}')">
-                            ${statusEmoji} ${date} - ${session.exchange_count} exchanges - ${session.final_status.toUpperCase()}
+                            ${statusEmoji} ${participant} - ${date} - ${session.exchange_count} exchanges - ${session.final_status.toUpperCase()}
                         </li>
                     `;
                 });
@@ -1895,6 +1934,9 @@
                 liveExchanges = data.session.exchanges;
                 liveSessionId = sessionId;
                 
+                // Show the live session container
+                document.getElementById('live-session').classList.add('active');
+                
                 // Clear and rebuild the exchanges display
                 const container = document.getElementById('live-exchanges-container');
                 container.innerHTML = '';
@@ -1904,16 +1946,19 @@
                     displayPulseAnalysis(exchange);
                 });
                 
-                // Display final analysis
-                displayFinalAnalysis();
+                // Display final analysis only if session is complete
+                if (data.session.final_analysis) {
+                    displayFinalAnalysis();
+                } else {
+                    console.log('Session is incomplete, skipping final analysis');
+                }
                 
                 // Close the modal
                 const modal = document.querySelector('div[style*="position: fixed"]');
                 if (modal) modal.remove();
                 
-                // Switch to live mode view
+                // Ensure we're in live mode (user should already be there)
                 document.getElementById('mode-live').checked = true;
-                switchMode();
                 
                 showStatus('complete', '✅ Previous standup loaded!');
                 
@@ -1928,6 +1973,452 @@
             resetLiveMode();
             showStatus('complete', '🔄 Ready to start a new standup!');
         };
+        
+        // ====== LIVE MODE TABS: Switch between Record and AI Persona ======
+        
+        // AI Persona Runner state
+        let aiPersonaSessionId = null;
+        let aiCurrentExchange = 0;
+        let aiPersonaName = '';
+        
+        function switchLiveTab(tab) {
+            const recordTab = document.getElementById('tab-record');
+            const aiTab = document.getElementById('tab-ai-persona');
+            const recordContent = document.getElementById('record-tab-content');
+            const aiContent = document.getElementById('ai-persona-tab-content');
+            
+            if (tab === 'record') {
+                // Activate record tab
+                recordTab.classList.add('active');
+                recordTab.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                recordTab.style.color = 'white';
+                aiTab.classList.remove('active');
+                aiTab.style.background = 'white';
+                aiTab.style.color = '#667eea';
+                
+                recordContent.style.display = 'block';
+                aiContent.style.display = 'none';
+            } else {
+                // Activate AI persona tab
+                aiTab.classList.add('active');
+                aiTab.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                aiTab.style.color = 'white';
+                recordTab.classList.remove('active');
+                recordTab.style.background = 'white';
+                recordTab.style.color = '#667eea';
+                
+                aiContent.style.display = 'block';
+                recordContent.style.display = 'none';
+                
+                // Load personas for AI runner if not already loaded
+                if (document.getElementById('ai-persona-select').options.length === 1) {
+                    loadAIPersonas();
+                }
+            }
+        }
+        
+        // ====== AI PERSONA RUNNER ======
+        
+        // Load personas for AI runner
+        async function loadAIPersonas() {
+            try {
+                const response = await fetch('/api/personas');
+                const data = await response.json();
+                
+                const select = document.getElementById('ai-persona-select');
+                select.innerHTML = '<option value="">Choose a persona...</option>';
+                
+                data.personas.forEach(persona => {
+                    const option = document.createElement('option');
+                    option.value = persona.name;
+                    option.textContent = `${persona.name.charAt(0).toUpperCase() + persona.name.slice(1)} - ${persona.archetype}`;
+                    option.dataset.description = persona.description;
+                    select.appendChild(option);
+                });
+                
+                document.getElementById('start-ai-persona-btn').disabled = false;
+            } catch (error) {
+                console.error('Error loading AI personas:', error);
+            }
+        }
+        
+        // Show AI persona description
+        document.getElementById('ai-persona-select').addEventListener('change', (e) => {
+            const select = e.target;
+            const descDiv = document.getElementById('ai-persona-description');
+            
+            if (select.value) {
+                const option = select.options[select.selectedIndex];
+                const description = option.dataset.description;
+                if (description) {
+                    descDiv.textContent = description;
+                    descDiv.style.display = 'block';
+                } else {
+                    descDiv.style.display = 'none';
+                }
+            } else {
+                descDiv.style.display = 'none';
+            }
+        });
+        
+        // Start AI Persona Runner
+        document.getElementById('start-ai-persona-btn').addEventListener('click', async () => {
+            const select = document.getElementById('ai-persona-select');
+            const persona = select.value;
+            
+            if (!persona) {
+                alert('Please select a persona');
+                return;
+            }
+            
+            await startAIPersonaRunner(persona);
+        });
+        
+        async function startAIPersonaRunner(personaName) {
+            try {
+                // Reset state
+                aiCurrentExchange = 0;
+                aiPersonaName = personaName;
+                document.getElementById('ai-exchanges-container').innerHTML = '';
+                
+                // Disable button and show loading
+                document.getElementById('start-ai-persona-btn').disabled = true;
+                showStatus('generating', `Starting AI standup for ${personaName}...`);
+                
+                // Call backend to start AI persona session
+                const formData = new FormData();
+                formData.append('persona_name', personaName);
+                
+                const response = await fetch('/api/ai-persona/start', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to start AI persona session');
+                }
+                
+                const data = await response.json();
+                aiPersonaSessionId = data.session_id;
+                
+                // Show session UI
+                document.getElementById('ai-persona-session').style.display = 'block';
+                document.getElementById('ai-progress').textContent = `Question 1 of 5`;
+                
+                showStatus('complete', `✅ AI standup started for ${personaName}!`);
+                
+                // Auto-play first question and start first exchange
+                playAIQuestionAudio(data.first_question_audio_url, data.first_question_text);
+                
+            } catch (error) {
+                console.error('Error starting AI persona runner:', error);
+                showStatus('error', `Failed to start AI persona: ${error.message}`);
+                document.getElementById('start-ai-persona-btn').disabled = false;
+            }
+        }
+        
+        // Play AI question audio and auto-start exchange
+        function playAIQuestionAudio(audioUrl, questionText) {
+            if (!audioUrl) return;
+            
+            // Show AI speaking indicator
+            showAIPhaseIndicator('ai-speaking');
+            
+            const audio = new Audio(audioUrl);
+            audio.play().catch(e => {
+                console.error('Error playing AI question audio:', e);
+                hideAIPhaseIndicator();
+            });
+            
+            // Auto-start exchange when audio ends
+            audio.onended = () => {
+                hideAIPhaseIndicator();
+                
+                // Wait 200ms then start exchange
+                setTimeout(() => {
+                    runAIExchange(aiCurrentExchange, questionText);
+                }, 200);
+            };
+            
+            audio.onerror = () => {
+                console.error('Error loading AI question audio');
+                hideAIPhaseIndicator();
+            };
+        }
+        
+        // Run one AI persona exchange
+        async function runAIExchange(exchangeNumber, questionText) {
+            try {
+                // Show analyzing phase
+                showAIPhaseIndicator('analyzing');
+                showStatus('generating', `AI persona ${aiPersonaName} is responding (Exchange ${exchangeNumber + 1}/5)...`);
+                
+                // Call backend to execute exchange
+                const formData = new FormData();
+                formData.append('session_id', aiPersonaSessionId);
+                formData.append('exchange_number', exchangeNumber);
+                
+                const response = await fetch('/api/ai-persona/exchange', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Exchange failed');
+                }
+                
+                const data = await response.json();
+                
+                // Hide analyzing phase
+                hideAIPhaseIndicator();
+                
+                // Add question text to data
+                data.question_text = questionText;
+                
+                // Display the exchange analysis
+                displayAIExchangeAnalysis(data);
+                
+                // Auto-play answer audio
+                const answerAudio = new Audio(data.answer_audio_url);
+                answerAudio.play();
+                
+                // When answer finishes, proceed to next question or show final analysis
+                answerAudio.onended = () => {
+                    if (data.is_complete) {
+                        // Show final analysis
+                        showStatus('complete', `✅ AI standup complete for ${aiPersonaName}!`);
+                        displayAIFinalAnalysis();
+                        document.getElementById('start-ai-persona-btn').disabled = false;
+                    } else {
+                        // Continue to next exchange
+                        aiCurrentExchange++;
+                        document.getElementById('ai-progress').textContent = `Question ${aiCurrentExchange + 1} of 5`;
+                        
+                        showStatus('complete', `✅ Exchange ${exchangeNumber + 1} complete. Next question...`);
+                        
+                        // Auto-play next question
+                        setTimeout(() => {
+                            playAIQuestionAudio(data.next_question_audio_url, data.next_question);
+                        }, 1000);
+                    }
+                };
+                
+            } catch (error) {
+                console.error('Error running AI exchange:', error);
+                showStatus('error', `Exchange failed: ${error.message}`);
+                hideAIPhaseIndicator();
+            }
+        }
+        
+        // Display AI exchange analysis
+        function displayAIExchangeAnalysis(data) {
+            const container = document.getElementById('ai-exchanges-container');
+            
+            // Create exchange element
+            const exchangeEl = document.createElement('div');
+            exchangeEl.className = 'live-exchange';
+            
+            // Question
+            exchangeEl.innerHTML = `
+                <div class="exchange-question">
+                    <div class="speaker-label interviewer">🔊 AI Interviewer</div>
+                    <div class="text-content">"${data.question_text}"</div>
+                </div>
+                
+                <div class="exchange-answer" style="margin-top: 15px;">
+                    <div class="speaker-label persona">💬 ${aiPersonaName.charAt(0).toUpperCase() + aiPersonaName.slice(1)}</div>
+                    <div class="text-content">"${data.answer_text}"</div>
+                </div>
+            `;
+            
+            // Analysis (reuse Live Mode display format)
+            const analysisHTML = `
+                <div class="pulse-analysis">
+                    <div class="analysis-header">
+                        <div class="analysis-title">📊 Analysis</div>
+                        <div class="confidence-badge high">
+                            ${(data.analysis.pulse_analysis.confidence * 100).toFixed(0)}% Confidence
+                        </div>
+                    </div>
+                    
+                    <!-- Transcript -->
+                    <div class="transcript-section">
+                        <div class="section-label">📝 Transcript</div>
+                        <div class="transcript-text">"${data.analysis.pulse_analysis.transcript}"</div>
+                    </div>
+                    
+                    <!-- Emotions -->
+                    <div class="emotion-bar-chart">
+                        <div class="section-label">😀 Emotions Detected</div>
+                        ${renderEmotionBars(data.analysis.pulse_analysis.emotions)}
+                    </div>
+                    
+                    <!-- Speech Metrics -->
+                    <div class="speech-metrics">
+                        <div class="section-label" style="grid-column: 1 / -1;">🗣️ Speech Patterns</div>
+                        <div class="metric-item">
+                            <div class="metric-label">Filler Words</div>
+                            <div class="metric-value">${data.analysis.speech_patterns.filler_word_count}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Speech Rate</div>
+                            <div class="metric-value">${data.analysis.speech_patterns.speech_rate_wpm} wpm</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Hesitation</div>
+                            <div class="metric-value">${(data.analysis.speech_patterns.hesitation_score * 100).toFixed(0)}%</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Conversational Signals -->
+                    <div class="conversational-signals">
+                        <div class="section-label" style="grid-column: 1 / -1;">💬 Conversational Signals</div>
+                        <div class="signal-item">
+                            <div class="signal-label">Vagueness</div>
+                            <div class="signal-value">${(data.analysis.conversational_signals.vagueness * 100).toFixed(0)}%</div>
+                        </div>
+                        <div class="signal-item">
+                            <div class="signal-label">Hedging Words</div>
+                            <div class="signal-value">${data.analysis.conversational_signals.hedging_count}</div>
+                        </div>
+                        <div class="signal-item">
+                            <div class="signal-label">Specificity</div>
+                            <div class="signal-value">${(data.analysis.conversational_signals.specificity * 100).toFixed(0)}%</div>
+                        </div>
+                        <div class="signal-item">
+                            <div class="signal-label">Help Seeking</div>
+                            <div class="signal-value">${data.analysis.conversational_signals.help_seeking ? '✅ Yes' : '❌ No'}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 6px; border-left: 3px solid #667eea;">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Stuck Probability</div>
+                        <div style="font-size: 24px; font-weight: 600; color: #333;">${(data.analysis.stuck_probability * 100).toFixed(1)}%</div>
+                    </div>
+                </div>
+            `;
+            
+            exchangeEl.innerHTML += analysisHTML;
+            container.appendChild(exchangeEl);
+            
+            // Scroll to bottom
+            exchangeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        // Display AI final analysis
+        async function displayAIFinalAnalysis() {
+            try {
+                const container = document.getElementById('ai-exchanges-container');
+                
+                // Construct progress data from the exchanges displayed
+                // Each exchange element has the stuck probability in the data we already displayed
+                const exchangeElements = container.querySelectorAll('.live-exchange');
+                const progressData = [];
+                
+                exchangeElements.forEach((el, idx) => {
+                    // Extract stuck probability from the displayed text
+                    const probText = el.querySelector('.pulse-analysis > div:last-child > div:last-child');
+                    if (probText) {
+                        const probValue = parseFloat(probText.textContent.replace('%', '')) / 100;
+                        
+                        let status = 'on_track';
+                        if (probValue > 0.7) status = 'stuck';
+                        else if (probValue > 0.4) status = 'warning';
+                        
+                        progressData.push({
+                            exchange: idx + 1,
+                            stuck_probability: probValue,
+                            status: status
+                        });
+                    }
+                });
+                
+                if (progressData.length === 0) {
+                    console.error('No exchange data found for final analysis');
+                    return;
+                }
+                
+                const finalProb = progressData[progressData.length - 1];
+                const finalStatus = finalProb.status;
+                
+                const statusEmoji = {
+                    'on_track': '✅',
+                    'warning': '⚠️',
+                    'stuck': '🚨'
+                }[finalStatus] || '❓';
+                
+                const finalHTML = `
+                    <div class="final-analysis">
+                        <h2>🎯 Final Stuck Detection Analysis - ${aiPersonaName}</h2>
+                        
+                        <div class="progress-chart">
+                            ${progressData.map(item => `
+                                <div class="progress-item ${item.status}">
+                                    <div class="progress-label">Exchange ${item.exchange}</div>
+                                    <div class="progress-bar-wrapper">
+                                        <div class="progress-bar-fill" style="width: ${(item.stuck_probability * 100).toFixed(0)}%">
+                                            ${(item.stuck_probability * 100).toFixed(0)}%
+                                        </div>
+                                    </div>
+                                    <div style="font-weight: 600;">${item.status.replace('_', ' ').toUpperCase()}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                        <div style="text-align: center; font-size: 24px; margin: 20px 0; font-weight: 600;">
+                            ${statusEmoji} Final Status: ${finalStatus.replace('_', ' ').toUpperCase()}
+                        </div>
+                        
+                        <button class="restart-btn" onclick="resetAIPersonaRunner()">
+                            🔄 Run Again
+                        </button>
+                    </div>
+                `;
+                
+                container.insertAdjacentHTML('beforeend', finalHTML);
+                container.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+            } catch (error) {
+                console.error('Error displaying final analysis:', error);
+            }
+        }
+        
+        // Reset AI Persona Runner
+        window.resetAIPersonaRunner = function() {
+            aiCurrentExchange = 0;
+            aiPersonaSessionId = null;
+            aiPersonaName = '';
+            
+            document.getElementById('ai-persona-session').style.display = 'none';
+            document.getElementById('ai-exchanges-container').innerHTML = '';
+            document.getElementById('start-ai-persona-btn').disabled = false;
+            document.getElementById('ai-persona-select').value = '';
+            document.getElementById('ai-persona-description').style.display = 'none';
+            
+            showStatus('complete', '🔄 Ready to run another AI persona!');
+        };
+        
+        // AI Phase Indicators
+        function showAIPhaseIndicator(phase) {
+            const indicator = document.getElementById('ai-phase-indicator');
+            
+            let content = '';
+            if (phase === 'ai-speaking') {
+                content = '🤖 AI is asking question...';
+            } else if (phase === 'analyzing') {
+                content = '⏳ AI persona is responding and analyzing...<span class="analyzing-spinner"></span>';
+            }
+            
+            indicator.innerHTML = content;
+            indicator.className = `phase-indicator ${phase} active`;
+        }
+        
+        function hideAIPhaseIndicator() {
+            const indicator = document.getElementById('ai-phase-indicator');
+            indicator.classList.remove('active', 'ai-speaking', 'analyzing');
+        }
         
         // Load personas on page load
         loadPersonas();
