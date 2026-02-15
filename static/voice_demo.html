@@ -1681,8 +1681,8 @@
             exchangeEl.innerHTML += analysisHTML;
             container.appendChild(exchangeEl);
             
-            // Scroll to bottom
-            exchangeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            // Don't auto-scroll during recording - keeps recording button accessible
+            // User can manually scroll to see analysis
         }
         
         // Render emotion bars
