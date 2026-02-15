@@ -8,6 +8,33 @@ Engineers speak naturally into their microphone. AsyncStandup analyzes their res
 
 The system asks adaptive follow-up questions and provides real-time stuck probability scores.
 
+## Quick Start (2 minutes)
+```bash
+# 1. Clone and setup (one command)
+git clone <repo-url> && cd async_standup && uv sync
+
+# 2. Add API keys
+cp .env.example .env
+# Edit .env: Add SMALLEST_API_KEY and OPENAI_API_KEY
+
+# 3. Run
+uv run python voice_demo_server.py
+
+# 4. Open browser
+open http://localhost:8000
+```
+
+**First time?** 
+- Get Smallest.ai API key: [Contact Smallest.ai](https://smallest.ai)
+- Get OpenAI API key: [OpenAI Platform](https://platform.openai.com/api-keys)
+- Select "Live Mode" → Grant mic permission → Start speaking!
+
+**That's it!** The system will:
+1. Ask you standup questions (AI voice)
+2. Record your answers (your mic)
+3. Show real-time stuck probability analysis
+4. Generate adaptive follow-up questions
+
 ## Live Mode Architecture
 
 ### System Block Diagram
