@@ -1,8 +1,8 @@
-# AsyncStandup 🚀
+# Standup Buddy 🚀
 
 **AI-powered standup bot that detects when engineers are stuck through real-time voice analysis during daily standups.**
 
-Engineers speak naturally into their microphone. AsyncStandup analyzes their responses using:
+Engineers speak naturally into their microphone. Standup Buddy analyzes their responses using:
 - **70% Conversational Analysis**: What they say (vagueness, hedging, help-seeking)
 - **30% Emotional Signals**: How they sound (frustration, anxiety, confidence)
 
@@ -11,7 +11,7 @@ The system asks adaptive follow-up questions and provides real-time stuck probab
 ## Quick Start (2 minutes)
 ```bash
 # 1. Clone and setup (one command)
-git clone <repo-url> && cd async_standup && uv sync
+git clone https://github.com/lightshadow1/standup_buddy && cd standup_buddy && uv sync
 
 # 2. Add API keys
 cp .env.example .env
@@ -201,7 +201,7 @@ stuck_probability = conversational_score * 0.7 + emotional_score * 0.3
 
 ## Why Voice Over Text?
 
-AsyncStandup is fundamentally **voice-first**, not text-with-audio bolted on:
+Standup Buddy is fundamentally **voice-first**, not text-with-audio bolted on:
 
 ### Signals Only Voice Can Capture
 
@@ -263,7 +263,7 @@ Example progression showing engineer becoming stuck over 5 exchanges:
 
 ### Testing Modes
 
-For development and testing, AsyncStandup includes:
+For development and testing, Standup Buddy includes:
 - **Demo Mode**: Pre-generated AI personas (Steve, Sarah, Marcus, Priya, Alex) for presentation demos
 - **AI Persona Runner**: Automated AI-vs-AI conversations for testing detection algorithms
 
@@ -281,8 +281,8 @@ These modes validate the hybrid detection approach but are **not the primary pro
 
 ```bash
 # Clone repository
-git clone <repository-url>
-cd async_standup
+git clone https://github.com/lightshadow1/standup_buddy
+cd standup_buddy
 
 # Install dependencies with uv
 uv sync
