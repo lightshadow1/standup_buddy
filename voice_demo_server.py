@@ -813,25 +813,48 @@ def generate_persona_answer(
     # Get persona definition
     persona = get_persona(persona_name)
     
-    # All exchanges are on Day 1 (single conversation)
-    day = 1
+    # For 3-exchange POC: Map exchange to progression
+    # Exchange 0 (1st) = Day 1-2 (relatively healthy)
+    # Exchange 1 (2nd) = Day 3 (warning signs emerging)
+    # Exchange 2 (3rd) = Day 4-5 (clearly stuck)
+    
+    # Calculate progression stage
+    if exchange_number == 0:
+        progression_stage = "early (Day 1-2)"
+        intensity = "mild"
+    elif exchange_number == 1:
+        progression_stage = "middle (Day 3)"
+        intensity = "moderate"
+    else:  # exchange_number == 2
+        progression_stage = "late (Day 4-5)"
+        intensity = "strong"
     
     # Build context from previous exchanges
     context = ""
     if previous_exchanges:
-        context = "\n\nPrevious conversation:\n"
+        context = "\n\nPrevious conversation (this same standup):\n"
         for prev in previous_exchanges:
             context += f"Q: {prev['question_text']}\n"
             context += f"A: {prev['answer_text']}\n\n"
     
-    # Create system prompt for single conversation
+    # Create system prompt showing progression within single conversation
     system_prompt = f"""{persona['system_prompt']}
 
-CONTEXT: This is a single standup conversation happening on Day {day}.
-All questions are part of the same standup meeting.
+CONTEXT: This is a single standup conversation with 3 questions total.
+You are on question {exchange_number + 1} of 3.
+
+IMPORTANT - Show progression within this single conversation:
+- Question 1: Show your {progression_stage} state with {intensity} stuck signals
+- As the interviewer probes deeper with each question, your true state becomes more apparent
+- Your stuck patterns should become MORE VISIBLE with each follow-up question
+
+For {persona['name']} archetype, this means:
+- Question 1: Relatively composed, moderate vagueness
+- Question 2: When pressed for details, more hedging and evasiveness emerge  
+- Question 3: Fully display your stuck pattern - high vagueness, lots of hedging, avoid help
 
 Respond to the standup question in character. Keep your answer to 50-100 words.
-Stay consistent with your Day {day} state as described in your persona.
+Show {intensity} intensity of your stuck pattern for this question.
 """
     
     user_prompt = f"""Question: {question}{context}
@@ -916,17 +939,28 @@ async def execute_ai_exchange(
         emotions = pulse_result.get('emotions', {})
         confidence = pulse_result.get('confidence', 0.95)
         
-        # Step 4: Analyze with GPT-4 for conversational signals
+        # Step 4: Analyze with GPT-4 for conversational signals (with overconfident detection)
         print(f"[AI Persona] Analyzing conversational signals...")
         analysis_prompt = f"""Analyze this standup response for stuck signals:
 
 "{transcript}"
+
+IMPORTANT - Two types of stuck engineers:
+1. DEFENSIVE STUCK: Vague, hedging, avoids details (HIGH vagueness)
+2. OVERCONFIDENT STUCK: Specific, confident, but wrong direction or repeated task (LOW vagueness but STUCK)
+
+For OVERCONFIDENT pattern, look for:
+- Very detailed technical responses (low vagueness)
+- Same core task mentioned without completion
+- No help-seeking despite lack of progress
+- Confident language ("definitely", "clearly")
 
 Return JSON with:
 - vagueness_score (0-1, higher = more vague)
 - hedging_words (list of hedging words found like "um", "like", "I think")
 - specificity_score (0-1, higher = more specific)
 - help_seeking (boolean, true if asking for help or open to assistance)
+- overconfident_pattern (boolean, true if shows overconfident stuck pattern)
 - summary (brief 1-line analysis)
 """
         
@@ -949,18 +983,40 @@ Return JSON with:
         estimated_duration = 10
         speech_rate = (word_count / estimated_duration) * 60
         
-        # Calculate stuck probability
+        # Calculate stuck probability (matching Live Mode formula)
         vagueness = conversational_analysis.get('vagueness_score', 0)
-        hedging = len(conversational_analysis.get('hedging_words', [])) / 20
+        specificity = conversational_analysis.get('specificity_score', 0)
+        hedging_count = len(conversational_analysis.get('hedging_words', []))
+        help_seeking = conversational_analysis.get('help_seeking', False)
+        overconfident_pattern = conversational_analysis.get('overconfident_pattern', False)
+        
+        # Emotional signals
+        happiness = emotions.get('happiness', 0)
+        excitement = emotions.get('excitement', 0)
         sadness = emotions.get('sadness', 0)
         frustration = emotions.get('frustration', 0)
+        anxiety = emotions.get('anxiety', 0)
         
-        conversational_score = (vagueness * 0.6 + hedging * 0.4)
-        emotional_score = (sadness + frustration) / 2
+        # Conversational score (70% of total)
+        conversational_score = (
+            vagueness * 0.25 +                                # Vague language
+            (1 - specificity) * 0.25 +                        # Lack of specificity
+            (hedging_count / 20) * 0.2 +                      # Hedging words
+            (0 if help_seeking else 1) * 0.2 +                # Not seeking help
+            (1 if overconfident_pattern else 0) * 0.1         # Overconfident pattern
+        )
+        
+        # Emotional score (30% of total)
+        emotional_score = (
+            (sadness + frustration) * 0.4 +                   # Direct stuck indicators
+            (1 - (happiness + excitement)) * 0.3 +            # Lack of positive emotions
+            anxiety * 0.3                                     # Stress indicator
+        )
+        
         stuck_probability = conversational_score * 0.7 + emotional_score * 0.3
         
         # Step 5: Generate adaptive next question
-        is_complete = exchange_number >= 4
+        is_complete = exchange_number >= 2  # 3 total exchanges (0, 1, 2)
         
         if not is_complete:
             print(f"[AI Persona] Generating next question...")
