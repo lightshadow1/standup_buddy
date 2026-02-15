@@ -8,88 +8,92 @@
 
 ```mermaid
 graph TB
-    User["👤 User<br/>(Microphone)"]
-    Browser["🌐 Browser<br/>(JavaScript + MediaRecorder)"]
-    Server["⚙️ FastAPI Server<br/>(Python)"]
-    OpenAI["🤖 OpenAI<br/>(GPT-4o + TTS)"]
+    User["👤 Engineer<br/>(Voice Input)"]
+    Browser["🌐 Browser<br/>(MediaRecorder API)"]
+    Server["⚙️ FastAPI Server<br/>(Backend)"]
+    GPT4["🤖 GPT-4<br/>(Analysis + Questions)"]
+    TTS["🔊 OpenAI TTS<br/>(Audio Generation)"]
     Pulse["🎵 Smallest.ai Pulse<br/>(Transcription + Emotions)"]
-    Storage["💾 JSON Storage<br/>(Session History)"]
+    Storage["💾 Session Storage<br/>(History)"]
     
-    User -->|"Record Answer"| Browser
-    Browser -->|"Upload Audio (WebM)"| Server
-    Server -->|"Audio File"| Pulse
-    Pulse -->|"Transcript + Emotions"| Server
-    Server -->|"Conversation Analysis"| OpenAI
-    OpenAI -->|"Stuck Signals"| Server
-    Server -->|"Generate Question"| OpenAI
-    OpenAI -->|"Question Text"| Server
-    Server -->|"Text to Speech"| OpenAI
-    OpenAI -->|"Question Audio"| Server
-    Server -->|"Save Session"| Storage
-    Server -->|"Analysis + Audio URL"| Browser
-    Browser -->|"Display Analysis<br/>Play Next Question"| User
+    User -->|"1. Speak Answer"| Browser
+    Browser -->|"2. Upload Audio"| Server
+    Server -->|"3. Analyze Audio"| Pulse
+    Pulse -->|"4. Transcript + Emotions"| Server
+    Server -->|"5. Detect Stuck Signals"| GPT4
+    GPT4 -->|"6. Vagueness, Hedging, etc."| Server
+    Server -->|"7. Generate Next Question"| GPT4
+    GPT4 -->|"8. Question Text"| Server
+    Server -->|"9. Convert to Speech"| TTS
+    TTS -->|"10. Audio File"| Server
+    Server -->|"11. Store Session"| Storage
+    Server -->|"12. Analysis + Question"| Browser
+    Browser -->|"13. Display + Play"| User
     
     style User fill:#e3f2fd
     style Browser fill:#fff3e0
     style Server fill:#f3e5f5
-    style OpenAI fill:#e8f5e9
+    style GPT4 fill:#e8f5e9
+    style TTS fill:#c8e6c9
     style Pulse fill:#fce4ec
     style Storage fill:#f1f8e9
 ```
 
-### Sequence Diagram - Single Exchange
+### Sequence Diagram - Live Standup Flow
 
 ```mermaid
 sequenceDiagram
-    participant User
+    participant Engineer
     participant Browser
     participant Server
     participant Pulse
     participant GPT4
-    participant TTS
     
-    Note over Browser,Server: Session Start
+    Note over Engineer,Server: 1. Start Session
+    Engineer->>Browser: Click "Start My Standup"
     Browser->>Server: POST /api/interactive/start
-    Server->>TTS: Generate first question audio
-    TTS-->>Server: Question audio (WAV)
+    Server->>GPT4: Generate first question
+    GPT4-->>Server: "What did you work on yesterday?"
+    Server->>Server: Convert to audio (TTS)
     Server-->>Browser: {question_text, audio_url}
-    Browser->>User: 🔊 Play question
+    Browser->>Engineer: 🔊 Play question
     
-    Note over User,Browser: User Records Answer
-    User->>Browser: 🎤 Speak answer (auto-record)
-    Browser->>Browser: VAD detects 2s silence
-    Browser->>Browser: Stop recording
+    Note over Engineer,Browser: 2. Engineer Responds
+    Engineer->>Browser: 🎤 Speak answer
+    Browser->>Browser: Auto-record via MediaRecorder
+    Browser->>Browser: Detect 2s silence (VAD)
+    Browser->>Browser: Auto-stop recording
     
-    Note over Browser,Pulse: Analysis Pipeline
-    Browser->>Server: POST /api/interactive/record<br/>{audio, session_id}
-    Server->>Pulse: Upload audio for analysis
-    Pulse-->>Server: {transcript, confidence, emotions}
+    Note over Browser,GPT4: 3. Analyze Response
+    Browser->>Server: POST /api/interactive/record<br/>{audio_file, session_id}
+    Server->>Pulse: Transcribe + detect emotions
+    Pulse-->>Server: {transcript, emotions, confidence}
     
-    Server->>Server: Calculate speech patterns<br/>(filler words, rate, hesitation)
+    Server->>GPT4: Analyze conversation signals
+    GPT4-->>Server: {vagueness: 0.7,<br/>hedging_count: 12,<br/>help_seeking: false}
     
-    Server->>GPT4: Analyze conversation<br/>{transcript, context}
-    GPT4-->>Server: {vagueness, hedging, specificity,<br/>help_seeking, overconfident_pattern}
+    Server->>Server: Calculate stuck probability<br/>= (0.7 * conv_score) + (0.3 * emotion_score)
     
-    Server->>Server: Calculate stuck_probability<br/>(70% conv + 30% emotion)
-    
-    Note over Server,TTS: Generate Next Question
-    Server->>GPT4: Generate adaptive question<br/>(based on vagueness score)
-    GPT4-->>Server: next_question_text
-    Server->>TTS: Convert to audio
-    TTS-->>Server: Question audio (WAV)
-    
-    Server-->>Browser: {analysis, next_question,<br/>audio_url, is_complete}
-    Browser->>User: 📊 Display analysis
-    Browser->>User: 🔊 Play next question
-    
-    Note over Browser,Server: Repeat 5 times total
-    
-    alt After 5 exchanges
-        Browser->>Server: POST /api/interactive/save
-        Server->>Server: Calculate final analysis
-        Server-->>Browser: Session saved ✅
-        Browser->>User: 📈 Show stuck probability chart
+    Note over Server,GPT4: 4. Generate Next Question
+    alt Vagueness > 0.5
+        Server->>GPT4: "Can you be more specific?"
+    else Vagueness <= 0.5
+        Server->>GPT4: "What are you working on today?"
     end
+    GPT4-->>Server: Adaptive question text
+    Server->>Server: Convert to audio (TTS)
+    
+    Server-->>Browser: {analysis, stuck_probability,<br/>next_question, audio_url}
+    Browser->>Engineer: 📊 Display: Vagueness 70%, Hedging 12<br/>📈 Stuck probability: 58%
+    Browser->>Engineer: 🔊 Play next question
+    
+    Note over Engineer,Server: 5. Repeat for 5 exchanges
+    
+    Note over Browser,Server: 6. Complete Session
+    Browser->>Server: POST /api/interactive/save
+    Server->>Server: Generate final chart
+    Server-->>Browser: Session saved ✅
+    Browser->>Engineer: 📈 Show stuck probability progression<br/>Exchange 1: 28% → Exchange 5: 73%
 ```
 
 ## Core Insight
