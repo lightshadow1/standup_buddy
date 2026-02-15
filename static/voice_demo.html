@@ -1431,6 +1431,12 @@
                 
                 // Show session UI
                 document.getElementById('live-session').classList.add('active');
+                
+                // Show recording UI elements
+                document.getElementById('question-display').style.display = 'block';
+                document.getElementById('live-progress').style.display = 'block';
+                document.getElementById('phase-indicator').style.display = 'block';
+                
                 document.getElementById('question-text').textContent = data.question_text;
                 document.getElementById('live-progress').textContent = `Question ${currentQuestionNumber + 1} of 5`;
                 
@@ -1936,6 +1942,12 @@
                 
                 // Show the live session container
                 document.getElementById('live-session').classList.add('active');
+                
+                // Hide question display and progress (only for active recording)
+                document.getElementById('question-display').style.display = 'none';
+                document.getElementById('live-progress').style.display = 'none';
+                document.getElementById('phase-indicator').style.display = 'none';
+                document.getElementById('record-btn').style.display = 'none';
                 
                 // Clear and rebuild the exchanges display
                 const container = document.getElementById('live-exchanges-container');
