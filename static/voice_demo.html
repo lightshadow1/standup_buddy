@@ -1551,6 +1551,7 @@
         function hidePhaseIndicator() {
             const indicator = document.getElementById('phase-indicator');
             indicator.classList.remove('active', 'ai-speaking', 'listening', 'analyzing');
+            indicator.innerHTML = ''; // Clear content to prevent lingering text
         }
         
         // ====== LIVE MODE: Play Question Audio with Auto-Start ======
