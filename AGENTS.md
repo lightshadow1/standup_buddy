@@ -207,6 +207,31 @@ speech_params = {
 
 **Solution**: Pivoted to hybrid approach with conversational dominance (70/30)
 
+### Challenge 4: WebM Format Causes False Sadness Detection
+**Problem**: Live Mode recordings showed 59.5% sadness for neutral audio
+
+**Root Cause**: Browser MediaRecorder outputs WebM (Opus codec). Pulse API's emotion detection model processes WebM/Opus differently than MP3, causing false negative emotions. Testing showed:
+- MP3 (direct): 0.0% sadness ✅
+- WebM (browser): 59.5% sadness ❌
+- WebM → MP3 (converted): 0.0% sadness ✅
+
+**Solution**: Backend WebM → MP3 conversion before Pulse API
+```python
+def convert_webm_to_mp3(webm_path: str) -> str:
+    """Convert WebM to MP3 using ffmpeg."""
+    subprocess.run([
+        'ffmpeg', '-i', webm_path,
+        '-codec:a', 'libmp3lame',  # MP3 encoder
+        '-b:a', '128k',            # 128kbps bitrate
+        '-ar', '24000',            # 24kHz (matches TTS)
+        '-ac', '1',                # Mono
+        '-y', mp3_path
+    ], check=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    return mp3_path
+```
+
+**Impact**: Fixed false sadness detection in Live Mode. Emotion scores now accurate.
+
 ## Conversational Signals Explained
 
 ### Vagueness Score (0.0-1.0)
@@ -975,6 +1000,119 @@ conversational_score = (
 - `voice_demo_server.py` (lines 416-454): Updated session listing and retrieval
 - `static/voice_demo.html` (lines 1604, 1900-1902, 1937-1938, 1947-1951, 1958-1959): Fixed loading and display logic
 
+### Phase 9: POC Optimization (Completed)
+
+**Goal**: Optimize system for quick POC demos - reduce from 5 to 3 exchanges and ensure Steve shows warning signs immediately.
+
+#### Optimization 1: Reduced Exchanges from 5 to 3
+
+**Rationale**: 5 exchanges (~75 seconds) too long for quick demos. 3 exchanges (~45 seconds) more practical.
+
+**Changes**:
+- Backend: `voice_demo_server.py` line 642 changed `question_number >= 4` to `>= 2`
+- Frontend: Updated 6 locations in `static/voice_demo.html` from "Question X of 5" to "Question X of 3"
+- README: Updated all diagrams and documentation to reflect 3 exchanges
+
+**Impact**: ~30 seconds faster per demo, better attention retention
+
+#### Optimization 2: Steve Persona Updated to Start at Day 3 Warning State
+
+**Problem**: Steve started healthy (28% stuck) in Day 1 state, making live demos show "ON TRACK" initially - not compelling for POC.
+
+**Root Cause**: Persona designed for 5-day progression, but POC demos are single-day with 3 exchanges.
+
+**Solution**: Updated Steve persona to start already stuck (Day 3-4 state):
+
+**Changes** (`src/async_standup/personas.py`):
+```python
+# Before
+"You are Steve, stuck but hasn't admitted it yet."
+"Day 1: Relatively specific, optimistic"  # 10% vagueness, 28% stuck
+
+# After
+"You are Steve, stuck for a few days already."
+"You are currently in Day 3-4 state - already showing clear warning signs"
+"START with moderate vagueness (Day 3), then GET WORSE as you're probed"
+
+# Progression guidance:
+- Question 1: Somewhat vague (3-5 hedging words) → 40-50% stuck
+- Question 2: More defensive (6-10 hedging words) → 55-65% stuck
+- Question 3: Very vague (10-15 hedging words) → 70-80% stuck
+
+# Expected signals updated:
+vagueness: 50% → 85% (was 10% → 80%)
+hedging_count: 8 → 25 words (was 3 → 23)
+stuck_probability: 50% → 80% (was 28% → 73%)
+```
+
+**Results**:
+- ✅ Live Mode demos now show **WARNING** from Exchange 1
+- ✅ Clear progression visible within single standup: WARNING → WARNING → STUCK
+- ✅ More compelling for judges/stakeholders
+- ✅ Steve demo script created (`STEVE_DEMO_SCRIPT.md`) for live recordings
+
+#### Optimization 3: AI Persona Runner Formula Aligned with Live Mode
+
+**Problem**: AI Persona Runner used simplified stuck calculation, differing from Live Mode.
+
+**Before** (AI Persona Runner):
+```python
+conversational_score = (vagueness * 0.6 + hedging * 0.4)
+emotional_score = (sadness + frustration) / 2
+stuck_probability = conversational_score * 0.7 + emotional_score * 0.3
+```
+
+**After** (matching Live Mode):
+```python
+conversational_score = (
+    vagueness * 0.25 +
+    (1 - specificity) * 0.25 +
+    (hedging_count / 20) * 0.2 +
+    (0 if help_seeking else 1) * 0.2 +
+    (1 if overconfident_pattern else 0) * 0.1  # Added
+)
+
+emotional_score = (
+    (sadness + frustration) * 0.4 +
+    (1 - (happiness + excitement)) * 0.3 +
+    anxiety * 0.3
+)
+
+stuck_probability = conversational_score * 0.7 + emotional_score * 0.3
+```
+
+**Changes**:
+- Added overconfident pattern detection to AI Persona Runner analysis prompt
+- Updated stuck probability calculation to full 5-component conversational score
+- Fixed completion check from `>= 4` to `>= 2` for 3 exchanges
+- Enhanced `generate_persona_answer()` to map exchanges to progression stages:
+  - Exchange 0 (1st): Day 1-2 (mild intensity)
+  - Exchange 1 (2nd): Day 3 (moderate intensity)
+  - Exchange 2 (3rd): Day 4-5 (strong intensity)
+
+**Results**:
+- ✅ Consistent stuck detection across Live Mode and AI Persona Runner
+- ✅ Same formula = same results for same inputs
+- ✅ Overconfident stuck (Marcus) now detectable in AI Persona Runner
+
+#### Optimization 4: Documentation Updates
+
+**README.md**:
+- Added `ffmpeg` as required prerequisite with installation instructions
+- Updated Project Structure section after cleanup (removed 13 obsolete files)
+- Added WebM→MP3 conversion note in `analyze_audio.py` description
+
+**AGENTS.md**:
+- Added Challenge 4: WebM Format False Sadness Detection
+- Documented conversion solution with code example
+- Added Phase 9 to Development Timeline
+
+**Files Modified**:
+- `voice_demo_server.py`: AI Persona Runner formula, progression mapping, completion check
+- `src/async_standup/personas.py`: Steve persona system prompt and expected signals
+- `README.md`: Prerequisites, project structure
+- `AGENTS.md`: Challenge 4, Phase 9 documentation
+
 ## Development Timeline
 
 - **Session 1**: Foundation setup (storage, audio, Pulse API) + 52 tests ✅
@@ -1018,8 +1156,14 @@ conversational_score = (
   - Single-day conversation flow ✅
   - Session history bug fixes ✅
   - Complete integration and testing ✅
+- **Session 9**:
+  - POC optimization: Reduced exchanges from 5 to 3 ✅
+  - Steve persona updated to start at Day 3 warning state ✅
+  - AI Persona Runner formula aligned with Live Mode ✅
+  - WebM→MP3 conversion documentation ✅
+  - README updates (ffmpeg requirement, project structure) ✅
 
-**Total**: ~8 sessions, from hybrid detection → voice demo → live interactive mode → portable audio files → bug fixes and history → natural conversational flow → AI Persona Runner
+**Total**: ~9 sessions, from hybrid detection → voice demo → live interactive mode → portable audio files → bug fixes and history → natural conversational flow → AI Persona Runner → POC optimization
 
 ## Team Notes
 
