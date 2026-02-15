@@ -6,6 +6,7 @@ Generates audio for:
 """
 
 import os
+import time
 from typing import Dict, Tuple
 
 import requests
@@ -17,47 +18,77 @@ from openai import OpenAI
 load_dotenv()
 
 
-def generate_interviewer_audio(text: str, voice: str = "emily") -> bytes:
+def generate_interviewer_audio(text: str, voice: str = "emily", max_retries: int = 3) -> bytes:
     """Generate interviewer question using Smallest.ai Lightning API.
     
     Args:
         text: Question text to convert to speech
         voice: Voice ID from Smallest.ai Lightning (default: emily)
+        max_retries: Maximum number of retry attempts (default: 3)
         
     Returns:
         Audio data as bytes (audio format)
         
     Raises:
         ValueError: If SMALLEST_API_KEY not found
-        Exception: If API call fails
+        Exception: If API call fails after all retries
     """
     api_key = os.getenv("SMALLEST_API_KEY") or os.getenv("PULSE_API_KEY")
     if not api_key:
         raise ValueError("SMALLEST_API_KEY or PULSE_API_KEY not found in environment variables")
     
-    try:
-        url = "https://waves-api.smallest.ai/api/v1/lightning/get_speech"
-        
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "text": text,
-            "voice_id": voice,
-            "sample_rate": 24000,
-            "add_wav_header": True
-        }
-        
-        response = requests.post(url, json=payload, headers=headers)
-        
-        if response.status_code == 200:
-            return response.content
-        else:
-            raise Exception(f"API error: {response.status_code} - {response.text}")
-    except Exception as e:
-        raise Exception(f"Failed to generate interviewer audio: {e}")
+    url = "https://waves-api.smallest.ai/api/v1/lightning/get_speech"
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "text": text,
+        "voice_id": voice,
+        "sample_rate": 24000,
+        "add_wav_header": True
+    }
+    
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            # Set timeout to prevent hanging connections
+            response = requests.post(
+                url, 
+                json=payload, 
+                headers=headers,
+                timeout=30,  # 30 second timeout
+                stream=False  # Don't stream, get full response
+            )
+            
+            if response.status_code == 200:
+                return response.content
+            else:
+                last_error = f"API error: {response.status_code} - {response.text}"
+                if response.status_code >= 500:  # Server error, retry
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                        print(f"Server error, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(wait_time)
+                        continue
+                raise Exception(last_error)
+                
+        except (requests.exceptions.ChunkedEncodingError, 
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as e:
+            last_error = str(e)
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff
+                print(f"Network error ({type(e).__name__}), retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            else:
+                raise Exception(f"Failed to generate interviewer audio after {max_retries} attempts: {e}")
+        except Exception as e:
+            raise Exception(f"Failed to generate interviewer audio: {e}")
+    
+    raise Exception(f"Failed to generate interviewer audio after {max_retries} attempts: {last_error}")
 
 
 def generate_persona_audio(

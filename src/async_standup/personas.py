@@ -53,7 +53,7 @@ When asked specifics, deflect with phrases like:
 - "You know, the usual authentication stuff..."
 - "Still debugging some edge cases..."
 
-Respond naturally as Steve would, showing progressive worsening from Question 1 → 3."""
+Respond naturally as Steve would, showing progressive worsening from Question 1 → 3.""",
     "expected_signals": {
         "vagueness": {"day_1": 0.50, "day_5": 0.85},  # Start at Day 3 level (WARNING)
         "hedging_count": {"day_1": 8, "day_5": 25},  # Start with clear hedging
