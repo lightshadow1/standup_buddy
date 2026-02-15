@@ -2,6 +2,44 @@
 
 This document tracks the AI-assisted development of AsyncStandup, including design decisions, pivots, and implementation details.
 
+## 🎯 Executive Summary: What AsyncStandup Actually Is
+
+**Primary Product**: Real-time voice-based standup bot for engineers.
+- Engineers speak into microphone during daily standup
+- System analyzes speech for stuck signals (vagueness, hedging, emotions)
+- Provides immediate feedback and adaptive follow-up questions
+- Calculates stuck probability: 70% conversational + 30% emotional
+
+**Key Innovation**: Hybrid detection combining what engineers **say** (conversational analysis) with how they **sound** (emotional analysis).
+
+**Tech Stack**:
+- ✅ **Smallest.ai Pulse**: Transcription + emotion detection from real voice
+- ✅ **Smallest.ai Lightning**: AI interviewer question audio ("emily" voice)
+- ✅ **GPT-4o**: Conversational signal analysis + adaptive questioning
+- ❌ **OpenAI TTS**: Only used for testing modes, NOT for real users
+
+**Not The Product** (testing/demo tools only):
+- Demo Mode: Pre-generated AI personas for presentations
+- AI Persona Runner: Automated AI-vs-AI algorithm validation
+- Hybrid Demo: Command-line pipeline testing
+
+## Product Overview
+
+**Primary Use Case**: Live interactive standup with real engineers speaking into their microphone.
+
+**Architecture**:
+- Engineer speaks naturally → Browser records → Smallest.ai Pulse analyzes → GPT-4 detects stuck signals → Real-time feedback
+- Zero-click conversation flow with voice activity detection
+- Adaptive questioning based on detected vagueness
+- Session history for reviewing previous standups
+
+**Testing Modes** (for development/demos only):
+- **Demo Mode**: Pre-generated AI personas for presentations
+- **AI Persona Runner**: Automated AI-vs-AI testing of detection algorithms
+- **Hybrid Demo**: Command-line pipeline testing
+
+These testing modes validate the hybrid detection approach but are **not the primary product**.
+
 ## Project Evolution
 
 ### Phase 1: Emotion-Only Approach (Completed)
@@ -53,14 +91,22 @@ Clear progression validated the hybrid approach.
 
 ### API Choices
 
-#### OpenAI
-- **GPT-4o**: Conversation generation and analysis (high quality, structured output)
-- **gpt-4o-mini-tts**: Audio generation with emotional instructions (cost-effective)
+#### Smallest.ai (Primary APIs)
+- **Pulse API**: Audio transcription + emotion detection in one API call
+  - Used for: Real engineer voice analysis in Live Mode
+  - Query parameter: `emotion_detection=true`
+  - Supports multiple emotion categories
+- **Lightning API**: AI interviewer question audio generation
+  - Used for: All interviewer questions across all modes
+  - Voice: "emily" (professional, consistent)
 
-#### Smallest.ai Pulse
-- Audio transcription + emotion detection in one API call
-- Query parameter: `emotion_detection=true`
-- Supports multiple emotion categories
+#### OpenAI (Analysis + Testing)
+- **GPT-4o**: Conversation analysis and adaptive question generation
+  - Used for: All modes (Live, Demo, AI Persona Runner)
+  - Analyzes conversational stuck signals (vagueness, hedging, etc.)
+- **gpt-4o-mini-tts**: Persona audio generation for testing
+  - Used for: AI Persona Runner and Demo Mode only (not Live Mode)
+  - Generates persona voices with emotional instructions
 
 ### Design Patterns
 
@@ -267,9 +313,11 @@ Providing score breakdowns (conversational + emotional components) makes the sys
 ### 6. Realistic Data Generation
 GPT-4 can generate realistic conversations for demos/testing, reducing need for real standup data initially.
 
-### Phase 3: Persona System (Completed)
+### Phase 3: Persona System (Completed) - TESTING MODE
 
-**Insight**: One demo persona (defensive stuck engineer) isn't enough to test system robustness. Need diverse patterns.
+**Purpose**: Create diverse testing personas to validate detection algorithms without requiring real engineer data.
+
+**Note**: This is a **testing/demo feature**, not the primary product. Used to validate that the hybrid detection approach works across different stuck patterns.
 
 **Implementation**:
 - ✅ Persona module (`personas.py`) with 5 distinct engineer types
@@ -329,9 +377,11 @@ GPT-4 can generate realistic conversations for demos/testing, reducing need for 
 
 **Key Learning**: Help-seeking behavior is a strong protective signal. Sarah's moderate vagueness (40%) didn't trigger alerts because she consistently asked for help.
 
-### Phase 4: Voice Demo (Completed)
+### Phase 4: Voice Demo (Completed) - DEMO MODE
 
-**Goal**: Make the demo presentation-ready with VOICE - judges can HEAR the conversations, not just read analysis.
+**Goal**: Create browser-based demo mode with pre-generated audio for presentations.
+
+**Purpose**: Allow stakeholders to experience the system without needing real engineer participation. This is a **presentation tool**, not the primary product.
 
 **Challenge**: Text-based demos don't showcase the emotional progression and communication patterns that reveal stuck engineers.
 
@@ -405,13 +455,13 @@ Stream audio to browser on-demand
 5. Show analysis: 28% → 73% stuck probability
 6. Contrast with Priya: 15% → 22% (stays healthy)
 
-### Phase 5: Live Interactive Mode (Completed)
+### Phase 5: Live Interactive Mode (Completed) - PRIMARY PRODUCT
 
-**Goal**: Allow users to record their OWN standup via microphone and get real-time stuck detection analysis.
+**Goal**: Allow real engineers to conduct standup via microphone with real-time stuck detection.
 
-**Challenge**: Demo mode only showed AI-vs-AI conversations. Judges/users couldn't experience the system with their own voice.
+**Why This Is The Core Product**: Demo mode and personas were useful for validation, but the actual use case is engineers speaking naturally and getting immediate feedback. This is what AsyncStandup is designed to do.
 
-**Solution**: Browser-based live interactive mode with real-time microphone recording and Pulse API analysis.
+**Solution**: Browser-based live interactive mode with real-time microphone recording, Pulse API analysis, and adaptive questioning.
 
 **Implementation**:
 - ✅ Mode selector (Demo Mode / Live Mode)
@@ -765,13 +815,17 @@ const SILENCE_DURATION = 2000;  // milliseconds
   - After: Run in parallel = ~2-3s total
   - Benefit: ~1-2s saved per exchange
 
-### Phase 7: AI Persona Runner (Completed)
+### Phase 7: AI Persona Runner (Completed) - TESTING MODE
 
-**Goal**: Add automated AI-vs-AI standup mode within Live Mode for demos without microphone input.
+**Goal**: Add automated AI-vs-AI testing mode for algorithm validation without human input.
 
-**Challenge**: Live Mode required microphone, making it hard to demo repeatedly. Wanted automated conversations using personas but with the same adaptive question system as Live Mode.
+**Purpose**: This is a **testing tool**, not a customer-facing feature. Used to:
+- Validate detection algorithms work correctly
+- Test edge cases (overconfident, burnt out, overwhelmed patterns)
+- Run repeated tests without requiring human participation
+- Debug and calibrate stuck probability thresholds
 
-**Solution**: "Run AI Persona" tab within Live Mode that automatically generates persona responses and sends them through Pulse API for analysis.
+**Solution**: "Run AI Persona" tab within Live Mode that automatically generates persona responses and sends them through Pulse API for realistic analysis.
 
 **Implementation**:
 - ✅ **Backend endpoints** (`voice_demo_server.py`)

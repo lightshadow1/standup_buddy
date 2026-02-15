@@ -1,6 +1,12 @@
 # AsyncStandup 🚀
 
-**AI-powered standup bot that detects when engineers are stuck through hybrid conversational and emotional analysis.**
+**AI-powered standup bot that detects when engineers are stuck through real-time voice analysis during daily standups.**
+
+Engineers speak naturally into their microphone. AsyncStandup analyzes their responses using:
+- **70% Conversational Analysis**: What they say (vagueness, hedging, help-seeking)
+- **30% Emotional Signals**: How they sound (frustration, anxiety, confidence)
+
+The system asks adaptive follow-up questions and provides real-time stuck probability scores.
 
 ## Live Mode Architecture
 
@@ -94,31 +100,32 @@ sequenceDiagram
     Browser->>Engineer: 📈 Show stuck probability progression<br/>Exchange 1: 28% → Exchange 5: 73%
 ```
 
-## Core Insight
+## How It Works (Live Mode)
 
-Instead of relying solely on emotion detection, AsyncStandup combines:
-- **70% Conversational Analysis**: What engineers say and how they respond to follow-up questions
-- **30% Emotional Signals**: How they sound when speaking
-
-Vague answers + repeated tasks + avoiding detail + declining emotion = stuck, regardless of tone alone.
-
-## How It Works
-
-### Pipeline
+### Real-Time Pipeline
 
 ```
-1. GPT-4 generates realistic conversations (or uses real standup data)
+1. Engineer speaks into microphone (browser MediaRecorder)
    ↓
-2. OpenAI TTS converts to audio with emotional instructions
+2. Auto-recorded audio sent to Smallest.ai Pulse API
    ↓
-3. Smallest.ai Pulse API transcribes audio and extracts emotions
+3. Pulse transcribes speech and detects emotions
    ↓
-4. GPT-4 analyzes conversations for stuck signals
+4. GPT-4 analyzes transcript for conversational stuck signals
    ↓
 5. Calculate hybrid stuck probability (70% conv + 30% emotion)
    ↓
-6. Display results with intervention recommendations
+6. Display real-time analysis with adaptive next question
+   ↓
+7. After 5 exchanges, show final stuck probability progression
 ```
+
+### Key Features
+- ✅ **Zero-click conversation flow**: Auto-start recording, voice activity detection
+- ✅ **Adaptive questioning**: System adjusts questions based on vagueness
+- ✅ **Real-time analysis**: Immediate feedback after each response
+- ✅ **Session history**: Review previous standups anytime
+- ✅ **Privacy-focused**: Audio processed, not stored long-term
 
 ### Conversational Signals (70% weight)
 
@@ -165,19 +172,27 @@ stuck_probability = conversational_score * 0.7 + emotional_score * 0.3
 - `0.4-0.7`: ⚠️ **WARNING** - Monitor closely
 - `< 0.4`: ✅ **ON TRACK** - Healthy progress
 
-## Demo Results
+## Live Demo Results
 
-Real output from the hybrid demo showing progression from healthy → stuck:
+Example progression showing engineer becoming stuck over 5 exchanges:
 
-| Day | Status | Stuck Prob | Vagueness | Hedging | Emotion |
-|-----|--------|-----------|-----------|---------|----------|
-| 1 | ✅ ON TRACK | 27.9% | 10% | 5 | happiness 36.5% |
-| 2 | ✅ ON TRACK | 27.9% | 10% | 5 | happiness 33.8% |
-| 3 | ⚠️ WARNING | 41.9% | 40% | 9 | happiness 21.3% |
-| 4 | ⚠️ WARNING | 67.1% | 80% | 15 | happiness 8.3% |
-| 5 | 🚨 STUCK | 72.7% | 90% | 23 | happiness 14.7% |
+| Exchange | Status | Stuck Prob | Vagueness | Hedging | Help-Seeking |
+|----------|--------|-----------|-----------|---------|-------------|
+| 1 | ✅ ON TRACK | 28% | 30% | 5 | Yes |
+| 2 | ✅ ON TRACK | 35% | 40% | 8 | Yes |
+| 3 | ⚠️ WARNING | 48% | 55% | 12 | No |
+| 4 | ⚠️ WARNING | 62% | 70% | 15 | No |
+| 5 | 🚨 STUCK | 73% | 85% | 20 | No |
 
-**Analysis**: Clear progression from on_track (28%) to stuck (73%). Conversational signals (vagueness, hedging) increased dramatically while emotions declined.
+**Analysis**: Clear progression from healthy (28%) to stuck (73%). Conversational signals (vagueness, hedging) increased while help-seeking disappeared.
+
+### Testing Modes
+
+For development and testing, AsyncStandup includes:
+- **Demo Mode**: Pre-generated AI personas (Steve, Sarah, Marcus, Priya, Alex) for presentation demos
+- **AI Persona Runner**: Automated AI-vs-AI conversations for testing detection algorithms
+
+These modes validate the hybrid detection approach but are **not the primary product**. The main use case is **Live Mode with real engineers**.
 
 ## Installation
 
@@ -206,34 +221,51 @@ cp .env.example .env
 
 ## Usage
 
-### Run Full Hybrid Demo
+### Run Live Interactive Mode (Primary Use Case)
 
+```bash
+# Start the voice demo server
+uv run python voice_demo_server.py
+
+# Open browser to http://localhost:8000
+# Click "Live Mode" → "Record Your Standup"
+# Grant microphone permission and start speaking
+```
+
+**Live Mode Flow**:
+1. AI asks first question (auto-plays)
+2. You speak your answer (auto-records)
+3. System detects silence and auto-stops
+4. Real-time analysis displays:
+   - Transcript with confidence
+   - Emotions detected
+   - Speech patterns
+   - Conversational signals
+5. AI asks adaptive follow-up question
+6. Repeat for 5 exchanges
+7. View final stuck probability progression
+8. Session saved to history
+
+### Testing Modes (Development Only)
+
+#### Demo Mode
+Pre-generated AI persona conversations for presentations:
+```bash
+# In browser: Select "Demo Mode" → Choose persona → Generate
+# Personas: Steve (stuck), Sarah (overwhelmed), Marcus (overconfident), Priya (healthy), Alex (burnt out)
+```
+
+#### AI Persona Runner
+Automated AI-vs-AI testing:
+```bash
+# In browser: "Live Mode" → "Run AI Persona" tab → Select persona → Start
+# Validates detection algorithms without human input
+```
+
+#### Hybrid Demo (Command Line)
+Full pipeline test:
 ```bash
 uv run python hybrid_demo.py
-```
-
-This will:
-1. Generate 5 days of realistic conversations
-2. Convert to audio with emotional TTS
-3. Analyze with Pulse API for emotions
-4. Analyze with GPT-4 for conversational signals
-5. Calculate hybrid stuck probability
-6. Display detailed results and recommendations
-
-**Output**:
-- Audio files: `data/hybrid_demo/audio/`
-- JSON data: `data/hybrid_demo/hybrid_standups.json`
-
-### Generate Conversations Only
-
-```bash
-uv run python -m src.async_standup.conversation_agent
-```
-
-### Generate Audio from Conversations
-
-```bash
-uv run python generate_conversation_audio.py
 ```
 
 ### Run Tests
@@ -270,15 +302,21 @@ async_standup/
 
 ## API Keys
 
-### OpenAI API
-- **Purpose**: GPT-4 (conversations), TTS (audio generation)
-- **Models**: `gpt-4o`, `gpt-4o-mini-tts`
-- **Get key**: https://platform.openai.com/api-keys
-
-### Smallest.ai Pulse API
-- **Purpose**: Audio transcription + emotion detection
-- **Endpoint**: `https://waves-api.smallest.ai/api/v1/pulse/get_text`
+### Smallest.ai API (Required)
+- **Pulse API**: Audio transcription + emotion detection
+  - Endpoint: `https://waves-api.smallest.ai/api/v1/pulse/get_text`
+- **Lightning API**: AI interviewer questions (TTS)
+  - Endpoint: `https://waves-api.smallest.ai/api/v1/lightning/get_speech`
 - **Get key**: Contact Smallest.ai
+- **Environment**: `SMALLEST_API_KEY=...` or `PULSE_API_KEY=...`
+
+### OpenAI API (Required)
+- **Purpose**: GPT-4 conversation analysis and adaptive questioning
+- **Models**: `gpt-4o` (analysis), `gpt-4o-mini-tts` (testing mode only)
+- **Get key**: https://platform.openai.com/api-keys
+- **Environment**: `OPENAI_API_KEY=sk-...`
+
+**Note**: OpenAI TTS is only used for AI Persona testing modes. Live Mode uses Smallest.ai Lightning for interviewer questions and no TTS for the user's voice (direct microphone input).
 
 ## Configuration
 
@@ -361,13 +399,14 @@ uv run python -m src.async_standup.conversation_agent
 
 ## Future Enhancements
 
-- [ ] Real-time Slack integration
-- [ ] Historical trend analysis
-- [ ] Team-level aggregation
-- [ ] Custom signal weighting per team
+- [ ] Real-time Slack bot integration (async standup via DM)
+- [ ] Historical trend analysis (stuck patterns over weeks)
+- [ ] Team-level aggregation (team health dashboard)
+- [ ] Custom signal weighting per team culture
 - [ ] Integration with Jira/Linear for task context
-- [ ] Multi-language support
-- [ ] Voice-based standup capture
+- [ ] Multi-language support (non-English standups)
+- [ ] Mobile app for voice capture
+- [ ] Manager intervention recommendations
 
 ## Contributing
 
